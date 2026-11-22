@@ -29,6 +29,16 @@ Not merged into `main`; the submitted site stays the Sacramento-region version u
 * Logic in `web/notice.js` (no DOM), tested through Node by `pipeline/tests/test_notice.py` (month ends, leap years, the "not sure" set, neutral wording for passed dates, hash parsing and bad input). The questions are written for this tool; each step cites a checklist item.
 * Dates before Jan 1, 2027 and future dates show a warning; nothing is stored anywhere but the URL.
 
+### Independent evaluation of the follow-up (fixed)
+
+* Crashes: a malformed `%` in the address (`carb=50%`) and inherited names as the type (`type=toString`) broke the page. Decoding is now guarded and types are checked as own properties; both have tests.
+* 200 ppmv: at uncontrolled landfills the 35-day report covers exceedances of the § 95463(b)(2)(B) value, 200 ppmv (p. 3), and any reading of 200 ppmv or more brings the landfill under §§ 95464–95476 (§ 95463(b)(2)(B)1., p. 4; quote checked verbatim), including a gas collection design plan within a year (§ 95464(a)(1), p. 5). Added as a cited conditional step and checklist item; "high reading" replaced.
+* The 15-day report applies "at a controlled MSW landfill" (§ 95470(b)(7)(A)); the app now says so, since its "controlled" option also covers landfills with a gas control system. The 500 ppmv step now includes the one-month re-test and the second and third exceedance path.
+* Accessibility: the due-date table is no longer a live region rebuilt on every keystroke; one short status sentence is announced when the date or type changes.
+* State: the chosen type and CARB ID survive a range switch while the date is blank; a corrected site id keeps the notice; a year typed digit by digit (0202) is no longer taken as a date (2020–2099 only).
+* Brief: future-date note added; the CARB ID moved to its own line, with a last fitting step, after a 40-character ID pushed one brief to two pages.
+* Not adopted (judgement calls, open): softening "Can you share a copy?", taller answer boxes, and a one-line pointer to online filing and certification on the follow-up brief.
+
 ## Recent window (statewide branch)
 
 * The app and brief open on the 24 months before the fetch date (`recent_since` = 2024-11-22 for this snapshot; `build_sites.recent_since`, tested including Feb 29). Each site carries `recent` statistics computed by the same `site_stats` as the full record; the site's location stays the full-record centre.

@@ -94,6 +94,7 @@ body { font-variant-numeric: tabular-nums; background: var(--color-paper-2); }
 .sheet.is-tight { gap: 4pt; line-height: 1.25; }
 .sheet.is-tight .b-due-table td { padding-top: 2pt; padding-bottom: 2pt; line-height: 1.22; }
 .sheet.is-tight .b-cond { line-height: 1.22; }
+.sheet.is-tighter .b-due-table, .sheet.is-tighter .b-cond, .sheet.is-tighter .b-caveats ul { font-size: var(--pt-xs); }
 .sheet.is-tight .b-duties .duty { line-height: 1.22; padding: 1pt 0; }
 
 @page { size: letter; margin: 0; }

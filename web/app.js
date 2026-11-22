@@ -40,7 +40,7 @@
       btn.addEventListener("click", function () {
         var id = (currentSite && currentSite.id) || D.sites[0].id;
         keepFocus = true; // switching range keeps focus on the switch, unlike picking a site
-        var N = window.LMBNotice, keep = N ? N.toHash(N.fromHash(window.location.hash)) : "";
+        var N = window.LMBNotice, keep = N ? N.formToHash(N.formFromHash(window.location.hash)) : "";
         window.location.hash = (L.hashFor(id, btn.getAttribute("data-range")) + keep).slice(1);
       });
     });
@@ -257,8 +257,10 @@
   function noticePanel(full) {
     var N = window.LMBNotice;
     if (!N) return null;
-    var state = N.fromHash(window.location.hash) || { date: "", type: "unknown", carb: "" };
-    var out = L.el("div", { class: "notice-out", "aria-live": "polite" });
+    var state = N.formFromHash(window.location.hash);
+    var out = L.el("div", { class: "notice-out" });
+    // One short sentence for screen readers when the date or type changes, not the whole table on every keystroke.
+    var status = L.el("p", { class: "visually-hidden", role: "status" });
 
     var dateIn = L.el("input", { id: "notice-date", class: "field-input", type: "date", value: state.date || "", min: "2020-01-01", max: "2099-12-31", "aria-describedby": "notice-date-hint" });
     var carbIn = L.el("input", { id: "notice-carb", class: "field-input", type: "text", value: state.carb || "", maxlength: "40", autocomplete: "off", spellcheck: "false" });
@@ -271,15 +273,21 @@
 
     function read() {
       var checked = document.querySelector('input[name="notice-type"]:checked');
-      return { date: dateIn.value, type: checked ? checked.value : "unknown", carb: carbIn.value.trim().replace(/[^A-Za-z0-9 _.\-]/g, "").slice(0, 40) };
+      return { date: dateIn.value, type: checked ? checked.value : "unknown", carb: N.cleanCarb(carbIn.value.trim()) };
     }
+    var lastKey = "";
     function update() {
-      var st = read(), valid = N.parseISO(st.date) != null;
-      var extra = valid ? N.toHash(st) : "";
-      history.replaceState(null, "", L.hashFor(full.id, range) + extra);
+      var st = read(), valid = N.validNoticeDate(st.date);
+      history.replaceState(null, "", L.hashFor(full.id, range) + N.formToHash(st));
       var briefBtn = detailEl.querySelector(".detail-head .btn--primary");
-      if (briefBtn) briefBtn.setAttribute("href", "brief.html" + L.hashFor(full.id, range) + extra);
+      if (briefBtn) briefBtn.setAttribute("href", "brief.html" + L.hashFor(full.id, range) + N.toHash(st));
       renderNoticeOut(out, st, valid);
+      var key = (valid ? st.date : "") + "|" + st.type;
+      if (key !== lastKey) {
+        lastKey = key;
+        var first = valid ? N.steps(st.date, st.type).dated[0] : null;
+        status.textContent = first ? "Due dates shown. First: " + first.short.toLowerCase() + ", due " + L.fmtDate(first.due) + "." : "";
+      }
     }
     [dateIn, carbIn].forEach(function (i) { i.addEventListener("input", update); });
     radios.forEach(function (lab) { lab.querySelector("input").addEventListener("change", update); });
@@ -301,11 +309,11 @@
       ]),
       L.el("div", { class: "field field--end" }, [clear])
     ]);
-    renderNoticeOut(out, state, N.parseISO(state.date) != null);
+    renderNoticeOut(out, state, N.validNoticeDate(state.date));
     return L.el("section", { class: "block notice", "aria-labelledby": "notice-title" }, [
       L.el("h2", { id: "notice-title", text: "After a CARB notice: due dates and what to ask" }),
       L.el("p", { class: "lede", text: "If CARB has notified this landfill’s operator of a plume, enter the date the notice arrived to see when each step is due under the 2027 rule, and what to ask the operator." }),
-      form, out
+      form, status, out
     ]);
   }
 
@@ -345,10 +353,10 @@
       ])
     ]));
     if (s.conditional.length) {
-      out.appendChild(L.el("h3", { class: "notice-sub", text: (both ? "If controlled, and " : "") + "depending on what the survey finds" }));
+      out.appendChild(L.el("h3", { class: "notice-sub", text: "Depending on what the survey finds" }));
       out.appendChild(L.el("ul", { class: "notice-cond" }, s.conditional.map(function (c) {
         return L.el("li", {}, [
-          L.el("p", {}, [c.what + ". ", citeLink(c.item)]),
+          L.el("p", {}, [both ? L.el("span", { class: "due-type", text: c.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null, c.what + ". ", citeLink(c.item)]),
           L.el("p", { class: "notice-ask" }, ["Ask: " + c.ask])
         ]);
       })));
@@ -479,7 +487,7 @@
     var site = L.siteById(asked) || D.sites[0];
     renderSite(site);
     if (asked && asked !== site.id) {
-      history.replaceState(null, "", L.hashFor(site.id, range));
+      history.replaceState(null, "", L.hashFor(site.id, range) + (window.LMBNotice ? window.LMBNotice.formToHash(window.LMBNotice.formFromHash(window.location.hash)) : ""));
       detailEl.insertBefore(L.el("p", { class: "note", text: "No landfill matches “" + asked + "”, so the site with the most detections is shown." }), detailEl.children[1]);
     }
     if (statusEl) { detailEl.prepend(statusEl); statusEl.textContent = "Showing " + site.name; }

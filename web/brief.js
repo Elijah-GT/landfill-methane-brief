@@ -54,7 +54,7 @@
       row("Period", range === "all" ? "Full record since " + L.fmtDate(site.first_date)
         : "Last " + D.recent_months + " months, since " + L.fmtDate(D.recent_since)),
       row("Detections through", L.fmtDate(site.last_date)),
-      notice ? row("CARB notice received", L.fmtDate(notice.date) + (notice.carb ? ", ID " + notice.carb : "")) : null
+      notice ? row("CARB notice received", L.fmtDate(notice.date)) : null
     ])
   ]));
 
@@ -118,12 +118,15 @@
       ]);
     });
     var cond = s.conditional.map(function (c) {
-      return el("li", {}, [c.short + ". ", el("span", { class: "cite", text: cite(c.item) + ". " }), el("em", { text: "Ask: " + c.ask })]);
+      return el("li", {}, [both ? el("strong", { text: c.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null,
+        c.short + ". ", el("span", { class: "cite", text: cite(c.item) + ". " }), el("em", { text: "Ask: " + c.ask })]);
     });
     sheet.appendChild(el("section", { class: "b-block b-notice", "aria-labelledby": "b-duty-title" }, [
       el("h2", { id: "b-duty-title", text: "Follow-up after CARB’s notice of " + L.fmtDate(notice.date) +
         (notice.type === "controlled" ? " (controlled landfill)" : notice.type === "uncontrolled" ? " (uncontrolled landfill)" : " (landfill type not confirmed)") }),
+      notice.carb ? el("p", { class: "b-key", text: "CARB ID number: " + notice.carb }) : null,
       notice.date < N.EFFECTIVE ? el("p", { class: "b-key", text: "This notice predates the amended rule (effective " + L.fmtDate(N.EFFECTIVE) + "); these due dates may not apply." }) : null,
+      notice.date > today ? el("p", { class: "b-key", text: "The notice date is after the date this brief was prepared; check it." }) : null,
       el("table", { class: "b-due-table" }, [
         el("thead", {}, [el("tr", {}, [
           el("th", { scope: "col", text: "Due" }), el("th", { scope: "col", text: "Step and rule" }),
@@ -131,7 +134,7 @@
         ])]),
         el("tbody", {}, rows)
       ]),
-      cond.length ? el("p", { class: "b-key", text: (both ? "If controlled, and depending" : "Depending") + " on what the survey finds:" }) : null,
+      cond.length ? el("p", { class: "b-key", text: "Depending on what the survey finds:" }) : null,
       cond.length ? el("ul", { class: "b-cond" }, cond) : null,
       el("p", { class: "b-key", text: "Due date = date the notice arrived + the rule’s calendar days, not moved for weekends or holidays (the rule does not say); confirm with CARB. Duties start only with CARB’s notice (§ 95469(b), p. 26)." })
     ]));
@@ -198,6 +201,8 @@
       drawChart(chartH);
     }
     if (contentHeight() > limit) sheet.classList.add("is-tight");
+    sheet.classList.remove("is-tighter");
+    if (contentHeight() > limit) sheet.classList.add("is-tighter");
   }
   fit();
   // Measure again once the real font is in: fallback monospace sets wider and taller.

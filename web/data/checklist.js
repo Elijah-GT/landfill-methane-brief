@@ -104,12 +104,21 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "report-uncontrolled",
-          brief: "Report the survey and every high reading to CARB, with CARB’s ID number.",
-          duty: "Report to CARB: the notice date and CARB ID number, the test date, the instrument used, and each high reading with its location.",
+          brief: "Report the survey and every reading of 200 ppmv or more to CARB, with CARB’s ID number.",
+          duty: "Report to CARB: the notice date and CARB ID number, the test date, the instrument used, and each reading of 200 ppmv or more (the § 95463(b)(2)(B) value) with its location.",
           deadline: "Within 35 calendar days of the notice",
           section: "§ 95470(b)(7)(C)",
           quote: "Within 35 calendar days after receiving the notification at an uncontrolled MSW landfill: the date of the CARB notification; identification number provided by CARB in the notification",
           page: 49
+        },
+        {
+          id: "uncontrolled-200",
+          brief: "Any reading of 200 ppmv or more: the full rule then applies, including a gas collection design plan within a year.",
+          duty: "If any surface reading, including the survey after a CARB notice, is 200 ppmv or more, the landfill must comply with sections 95464 through 95476. That includes a gas collection and control system design plan within one year of detecting the leak, if a qualifying system is not installed (§ 95464(a)(1), p. 5).",
+          deadline: "Design plan within one year of the reading",
+          section: "§ 95463(b)(2)(B)1.",
+          quote: "If there is any measured concentration of methane of 200 ppmv or greater from the surface of an active, inactive, or closed MSW landfill, comply with sections 95464 through 95476",
+          page: 4
         }
       ]
     },
