@@ -190,35 +190,10 @@
   drawDetections(detRows);
 
   // ---------- where detections repeat ----------
-  // Greedy grouping of the period's detections: take the detection with the most others within
-  // SPOT_KM, call that a spot, remove its members, repeat. A spot is listed only when it has
-  // detections on at least two different days, so one flyover with several plumes is not
-  // read as recurrence. Plume locations are Carbon Mapper's estimated origins.
-  var SPOT_KM = 0.2;
-  function km(a, b) {
-    var r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
-    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return 2 * 6371 * Math.asin(Math.sqrt(h));
-  }
-  function findSpots(list) {
-    var left = list.slice(), out = [];
-    while (left.length) {
-      var best = null, members = [];
-      left.forEach(function (p) {
-        var m = left.filter(function (q) { return km(p, q) <= SPOT_KM; });
-        if (m.length > members.length) { members = m; best = p; }
-      });
-      if (members.length < 2) break;
-      left = left.filter(function (q) { return members.indexOf(q) < 0; });
-      var days = {};
-      members.forEach(function (q) { days[q.date] = true; });
-      var dates = members.map(function (q) { return q.date; }).sort();
-      var rated = members.filter(function (q) { return q.rate_kg_h != null; });
-      var top = rated.sort(function (a, b) { return b.rate_kg_h - a.rate_kg_h; })[0] || null;
-      if (Object.keys(days).length >= 2) out.push({ center: best, n: members.length, days: Object.keys(days).length, first: dates[0], last: dates[dates.length - 1], top: top });
-    }
-    return out;
-  }
+  // Spots come from web/spots.js (shared with the app): detections within 200 m of each other
+  // on two or more different days.
+  var SPOT_KM = window.LMBSpots.SPOT_KM;
+  function findSpots(list) { return window.LMBSpots.findSpots(list); }
   var spots = findSpots(shown.plumes);
   var spotBody = el("tbody");
   var spotNote = el("p", { class: "b-key" });
@@ -228,7 +203,7 @@
     spots.slice(0, n).forEach(function (sp, i) {
       spotBody.appendChild(el("tr", {}, [
         el("td", { class: "b-spot-n", text: String(i + 1) }),
-        el("td", { class: "num b-nowrap", text: sp.center.lat.toFixed(4) + ", " + sp.center.lon.toFixed(4) }),
+        el("td", { class: "num b-nowrap", text: sp.lat.toFixed(4) + ", " + sp.lon.toFixed(4) }),
         el("td", { class: "b-nowrap" }, [el("strong", { text: sp.n + " detections" }), el("br"), sp.days + " different days"]),
         el("td", { class: "b-nowrap", text: L.fmtDate(sp.first) + " to " + L.fmtDate(sp.last) }),
         el("td", { class: "num b-nowrap", text: sp.top ? L.fmtRate(sp.top.rate_kg_h) + " ± " + L.fmtRate(sp.top.uncertainty_kg_h) : "not published" }),

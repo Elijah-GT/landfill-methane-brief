@@ -5,8 +5,8 @@ Status, decisions and what was or was not verified. All times PST, Sun Nov 22, 2
 ## Status
 
 * **Core build complete** (data pipeline, app, cited checklist, one-page brief), well ahead of the 9:00 AM freeze.
-* Tests: 29 passing (`python -m pytest pipeline/tests -q`).
-* Brief: prints on exactly one US Letter page for all 9 sites (checked by printing each to PDF with headless Chrome and counting pages).
+* Tests: 51 passing (`python -m pytest pipeline/tests -q`; the notice and spot tests need Node).
+* Brief: prints on exactly one US Letter page for all 53 sites, with and without a notice, in both ranges (265 variants, checked by printing each to PDF with headless Chrome and counting pages).
 * Deployed to GitHub Pages from `web/` by `.github/workflows/pages.yml`.
 
 ## Statewide branch (`statewide`, started 08:37, after the 9:00 freeze was near)

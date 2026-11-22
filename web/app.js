@@ -458,6 +458,44 @@
         ])
       ]));
       window.LMBChart.render(chartBox, site, chartOpts());
+
+      // where detections repeat (same rule as the brief: within 200 m, on two or more days)
+      if (window.LMBSpots) {
+        var spots = window.LMBSpots.findSpots(site.plumes);
+        var radiusM = Math.round(window.LMBSpots.SPOT_KM * 1000);
+        var spotBlock = [
+          L.el("h2", { id: "spots-title", text: "Where detections repeat" }),
+          L.el("p", { class: "lede", text: spots.length
+            ? spots[0].n + " of " + site.plume_count + " detections " + (range === "all" ? "in the full record" : "in " + L.windowLabel()) +
+              " fall within " + radiusM + " m of one spot. Each spot below had detections on at least two different days, so it is not one flyover counted twice."
+            : "No spot had detections within " + radiusM + " m of each other on more than one day " + (range === "all" ? "in the full record." : "in " + L.windowLabel() + ".") })
+        ];
+        if (spots.length) {
+          spotBlock.push(L.el("div", { class: "table-wrap", role: "region", "aria-label": "Spots where detections repeat", tabindex: "0" }, [
+            L.el("table", { class: "table" }, [
+              L.el("caption", { class: "visually-hidden", text: "Spots where detections repeat at " + site.name }),
+              L.el("thead", {}, [L.el("tr", {}, [
+                L.el("th", { scope: "col", text: "Spot" }), L.el("th", { scope: "col", class: "num", text: "Detections" }),
+                L.el("th", { scope: "col", class: "num", text: "Days" }), L.el("th", { scope: "col", text: "First to last" }),
+                L.el("th", { scope: "col", class: "num", text: "Largest, kg/h" }), L.el("th", { scope: "col", text: "Ask the operator" })
+              ])]),
+              L.el("tbody", {}, spots.slice(0, 5).map(function (sp) {
+                return L.el("tr", {}, [
+                  L.el("td", { class: "num", text: sp.lat.toFixed(4) + ", " + sp.lon.toFixed(4) }),
+                  L.el("td", { class: "num", text: String(sp.n) }),
+                  L.el("td", { class: "num", text: String(sp.days) }),
+                  L.el("td", { text: L.fmtDate(sp.first) + " to " + L.fmtDate(sp.last) }),
+                  L.el("td", { class: "num", text: sp.top ? L.fmtRate(sp.top.rate_kg_h) + " ± " + L.fmtRate(sp.top.uncertainty_kg_h) : "not published" }),
+                  L.el("td", { text: "What is at this spot, and has it been checked or repaired since " + L.fmtDate(sp.last) + "?" })
+                ]);
+              }))
+            ])
+          ]));
+          spotBlock.push(L.el("p", { class: "note", text: "Locations are Carbon Mapper’s estimated plume origins, not ground measurements." +
+            (spots.length > 5 ? " The five spots with the most detections are shown." : "") }));
+        }
+        detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "spots-title" }, spotBlock));
+      }
     }
 
     // after a CARB notice
