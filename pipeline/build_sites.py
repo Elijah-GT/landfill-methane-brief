@@ -1,0 +1,143 @@
+"""Turn the plume snapshot into per-site data for the web app.
+
+    python pipeline/build_sites.py
+
+Reads  data/plumes_snapshot.json  (written by fetch_plumes.py)
+       pipeline/site_names.json   (hand-checked landfill names, each with a source)
+Writes web/data/sites.js          (window.LMB_DATA = {...}; a .js file so the
+                                   app also opens straight from disk, no server)
+
+No network access: this step only uses the committed snapshot.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from statistics import median
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from pipeline.sites import cluster_points, haversine_km, match_name, site_stats  # noqa: E402
+
+ROOT = Path(__file__).resolve().parent.parent
+SNAPSHOT = ROOT / "data" / "plumes_snapshot.json"
+NAMES = ROOT / "pipeline" / "site_names.json"
+OUT = ROOT / "web" / "data" / "sites.js"
+
+WASTE_SECTOR = "6A"
+CLUSTER_KM = 1.0
+NAME_RADIUS_KM = 3.0
+
+
+def _parse(ts: str) -> datetime:
+    return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+
+
+def slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def publication_lag_days(plumes: list[dict], since: str = "2025-01-01") -> dict:
+    lags = [
+        (_parse(p["published_at"]) - _parse(p["scene_timestamp"])).total_seconds() / 86400
+        for p in plumes
+        if p.get("published_at") and p["scene_timestamp"] >= since
+    ]
+    if not lags:
+        return {"since": since, "n": 0, "min": None, "median": None}
+    return {"since": since, "n": len(lags), "min": round(min(lags), 1), "median": round(median(lags), 1)}
+
+
+def plume_row(p: dict, lat: float, lon: float) -> dict:
+    return {
+        "plume_id": p["plume_id"],
+        "observed": p["scene_timestamp"],
+        "date": p["scene_timestamp"][:10],
+        "published": (p.get("published_at") or "")[:10] or None,
+        "rate_kg_h": p.get("emission_auto"),
+        "uncertainty_kg_h": p.get("emission_uncertainty_auto"),
+        "rate_withheld": bool(p.get("hide_emission")) or p.get("emission_auto") is None,
+        "platform": p.get("platform"),
+        "wind_speed_m_s": p.get("wind_speed_avg_auto"),
+        "wind_dir_deg": p.get("wind_direction_avg_auto"),
+        "lat": round(p["lat"], 5),
+        "lon": round(p["lon"], 5),
+        "km_from_center": round(haversine_km(lat, lon, p["lat"], p["lon"]), 2),
+    }
+
+
+def build(snapshot: dict, names: list[dict]) -> dict:
+    all_plumes = snapshot["plumes"]
+    waste = [p for p in all_plumes if p.get("sector") == WASTE_SECTOR]
+    sites = []
+    used_ids: set[str] = set()
+    for rank, idx in enumerate(cluster_points(waste, CLUSTER_KM), start=1):
+        members = sorted((waste[i] for i in idx), key=lambda p: p["scene_timestamp"])
+        stats = site_stats(members)
+        named = match_name(stats["lat"], stats["lon"], names, NAME_RADIUS_KM)
+        label = named["short_name"] if named else f"Unnamed waste site near {stats['lat']:.3f}, {stats['lon']:.3f}"
+        site_id = slugify(named["short_name"]) if named else f"site-{rank}"
+        while site_id in used_ids:
+            site_id += "-b"
+        used_ids.add(site_id)
+        rows = [plume_row(p, stats["lat"], stats["lon"]) for p in members]
+        sites.append({
+            "id": site_id,
+            "rank": rank,
+            "name": label,
+            "official_name": named.get("name") if named else None,
+            "county": named.get("county") if named else None,
+            "operator": named.get("operator") if named else None,
+            "name_confidence": named.get("confidence") if named else None,
+            "name_source_url": named.get("source_url") if named else None,
+            "name_distance_km": round(haversine_km(stats["lat"], stats["lon"], named["lat"], named["lon"]), 2)
+            if named else None,
+            **stats,
+            "max_km_from_center": max(r["km_from_center"] for r in rows),
+            "plumes": rows,
+        })
+
+    observed = sorted(p["scene_timestamp"] for p in all_plumes)
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fetched_at": snapshot["fetched_at"],
+        "source": snapshot.get("source"),
+        "source_url": snapshot.get("source_url"),
+        "bbox": snapshot.get("bbox"),
+        "cluster_km": CLUSTER_KM,
+        "total_plumes": len(all_plumes),
+        "waste_plumes": len(waste),
+        "oldest_observation": observed[0][:10] if observed else None,
+        "newest_observation": observed[-1][:10] if observed else None,
+        "publication_lag_days": publication_lag_days(all_plumes),
+        "sites": sites,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Build web/data/sites.js from the plume snapshot.")
+    ap.add_argument("--snapshot", type=Path, default=SNAPSHOT)
+    ap.add_argument("--names", type=Path, default=NAMES)
+    ap.add_argument("--out", type=Path, default=OUT)
+    args = ap.parse_args(argv)
+
+    snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
+    names = json.loads(args.names.read_text(encoding="utf-8")) if args.names.exists() else []
+    data = build(snapshot, names)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(
+        "// Generated by pipeline/build_sites.py. Do not edit by hand.\n"
+        f"window.LMB_DATA = {json.dumps(data, indent=1)};\n",
+        encoding="utf-8",
+    )
+    print(f"wrote {len(data['sites'])} sites ({data['waste_plumes']} waste-sector plumes) to {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
