@@ -51,62 +51,47 @@
     el("dl", { class: "b-dates" }, [
       row("Prepared", L.fmtDate(today)),
       row("Data fetched", L.fmtDate(D.fetched_at)),
-      row("Period", range === "all" ? "Full record since " + L.fmtDate(site.first_date)
+      row("Period", range === "all" || emptyWindow ? "Full record since " + L.fmtDate(site.first_date)
         : "Last " + D.recent_months + " months, since " + L.fmtDate(D.recent_since)),
       row("Detections through", L.fmtDate(site.last_date)),
       notice ? row("CARB notice received", L.fmtDate(notice.date)) : null
     ])
   ]));
 
-  // summary sentence
-  var who = kinds.aircraft && kinds.space ? "aircraft and satellites" : kinds.space ? (kinds.space === 1 ? "a satellite" : "satellites") : (kinds.aircraft === 1 ? "an aircraft" : "aircraft");
-  var summary = "";
-  if (emptyWindow) {
-    summary = "No plume was published at this site in the " + D.recent_months + " months to " + L.fmtDate(D.fetched_at) +
-      ". That does not mean nothing leaked: it may not have been flown over. The last detection was on " + L.fmtDate(site.last_date) +
-      "; the full record below has " + L.plural(site.plume_count, "detection") + " since " + L.fmtDate(site.first_date) + ". ";
-  } else {
-    var when = shown.first_date === shown.last_date ? "On " + L.fmtDate(shown.first_date)
-      : "Between " + L.fmtDate(shown.first_date) + " and " + L.fmtDate(shown.last_date);
-    summary = when + ", " + who + " detected " + L.plural(shown.plume_count, "methane plume") + " at this site" +
-      (kinds.aircraft && kinds.space ? " (" + kinds.aircraft + " from aircraft, " + kinds.space + " from satellites)" : "") + ". ";
-    if (shown.quantified_count === 1) {
-      summary += "Its published rate was " + L.fmtRateUnc(shown.max_rate_kg_h, shown.max_rate_uncertainty_kg_h) + ". ";
-    } else if (shown.quantified_count > 1) {
-      summary += "The median published rate was " + L.fmtRate(shown.median_rate_kg_h) + " kg/h; the largest was " +
-        L.fmtRateUnc(shown.max_rate_kg_h, shown.max_rate_uncertainty_kg_h) + " on " + L.fmtDate(shown.max_rate_date) + ". ";
-    }
-    if (withheld) summary += L.plural(withheld, "detection") + " had no published rate. ";
-    if (range === "recent" && site.plume_count > shown.plume_count) {
-      summary += "The full record since " + L.fmtDate(site.first_date) + " has " + L.plural(site.plume_count, "detection") + ".";
-    }
+  // ---------- key figures ----------
+  function fig(label, value, unit, sub) {
+    return el("div", { class: "b-fig" }, [
+      el("dt", { text: label }),
+      el("dd", { class: "b-fig-value" }, [el("span", { class: "b-fig-num", text: value }), unit ? el("span", { class: "b-fig-unit", text: " " + unit }) : null]),
+      sub ? el("dd", { class: "b-fig-sub", text: sub }) : null
+    ]);
   }
-  sheet.appendChild(el("p", { class: "b-summary", text: summary.trim() }));
-
-  // chart + per-year
-  var chartBox = el("div", { class: "b-chart" });
-  sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-chart-title" }, [
-    el("h2", { id: "b-chart-title", text: emptyWindow ? "Every published detection (none in the last " + D.recent_months + " months)"
-      : range === "recent" ? "Published detections in the last " + D.recent_months + " months" : "Every published detection" }),
-    el("p", { class: "b-key", text: "Dot: estimated rate (same-day dots spread). Bar: ± uncertainty. Square: no published rate. Gap: no published pass." }),
-    chartBox
+  var periodWord = emptyWindow || range === "all" ? "since " + L.fmtDate(shown.first_date) : "in the last " + D.recent_months + " months";
+  sheet.appendChild(el("dl", { class: "b-figs" }, [
+    fig("Detections", String(shown.plume_count), null,
+      periodWord + (range === "recent" && !emptyWindow && site.plume_count > shown.plume_count ? "; " + site.plume_count + " in the full record" : "")),
+    fig("Largest rate", shown.max_rate_kg_h == null ? "n/a" : L.fmtRate(shown.max_rate_kg_h), shown.max_rate_kg_h == null ? null : "kg/h",
+      shown.max_rate_kg_h == null ? "no published rate" : "± " + L.fmtRate(shown.max_rate_uncertainty_kg_h) + " kg/h, " + L.fmtDate(shown.max_rate_date)),
+    fig("Median rate", shown.median_rate_kg_h == null ? "n/a" : L.fmtRate(shown.median_rate_kg_h), shown.median_rate_kg_h == null ? null : "kg/h",
+      "of " + shown.quantified_count + " with a rate" + (withheld ? "; " + withheld + " without" : "")),
+    fig("Last detected", L.fmtDate(site.last_date), null,
+      kinds.space + " by satellite, " + kinds.aircraft + " from aircraft")
   ]));
-  var chartRange = range === "recent" && !emptyWindow ? { from: D.recent_since, to: D.fetched_at.slice(0, 10) } : {};
-  function drawChart(h) {
-    window.LMBChart.render(chartBox, shown, Object.assign({ width: 760, height: h, suffix: "-brief" }, chartRange));
+  if (emptyWindow) {
+    sheet.appendChild(el("p", { class: "b-alert", text: "No plume published here in the " + D.recent_months + " months to " + L.fmtDate(D.fetched_at) +
+      " (not proof of no leak: it may not have been flown over). Showing the full record." }));
   }
-  var chartH = 160;
-  drawChart(chartH);
 
-  // checklist, or with a notice date: the dated follow-up steps and what to ask
   function cite(id) {
     var hit = null;
     window.LMB_CHECKLIST.groups.forEach(function (g) { g.items.forEach(function (it) { if (it.id === id) hit = it; }); });
     return hit ? hit.section + ", p. " + hit.page : "";
   }
+
+  // ---------- with a notice: the follow-up steps come first, they are why the page was printed ----------
   if (notice) {
     var s = N.steps(notice.date, notice.type), both = notice.type === "unknown";
-    var rows = s.dated.map(function (d) {
+    var dueRows = s.dated.map(function (d) {
       return el("tr", {}, [
         el("td", { class: "b-due", text: L.fmtDate(d.due) }),
         el("td", {}, [
@@ -119,50 +104,119 @@
     });
     var cond = s.conditional.map(function (c) {
       return el("li", {}, [both ? el("strong", { text: c.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null,
-        c.short + ". ", el("span", { class: "cite", text: cite(c.item) + ". " }), el("em", { text: "Ask: " + c.ask })]);
+        c.short + ". ", el("span", { class: "cite", text: cite(c.item) })]);
     });
+    var flags = [
+      notice.carb ? "CARB ID: " + notice.carb + "." : null,
+      notice.date < N.EFFECTIVE ? "This notice predates the amended rule (effective " + L.fmtDate(N.EFFECTIVE) + "); these due dates may not apply." : null,
+      notice.date > today ? "Notice date is after the prepared date; check it." : null
+    ].filter(Boolean);
     sheet.appendChild(el("section", { class: "b-block b-notice", "aria-labelledby": "b-duty-title" }, [
       el("h2", { id: "b-duty-title", text: "Follow-up after CARB’s notice of " + L.fmtDate(notice.date) +
         (notice.type === "controlled" ? " (controlled landfill)" : notice.type === "uncontrolled" ? " (uncontrolled landfill)" : " (landfill type not confirmed)") }),
-      notice.carb ? el("p", { class: "b-key", text: "CARB ID number: " + notice.carb }) : null,
-      notice.date < N.EFFECTIVE ? el("p", { class: "b-key", text: "This notice predates the amended rule (effective " + L.fmtDate(N.EFFECTIVE) + "); these due dates may not apply." }) : null,
-      notice.date > today ? el("p", { class: "b-key", text: "The notice date is after the date this brief was prepared; check it." }) : null,
-      el("table", { class: "b-due-table" }, [
+      flags.length ? el("p", { class: "b-key", text: flags.join(" ") }) : null,
+      el("table", { class: "b-table b-due-table" }, [
         el("thead", {}, [el("tr", {}, [
           el("th", { scope: "col", text: "Due" }), el("th", { scope: "col", text: "Step and rule" }),
           el("th", { scope: "col", text: "Ask the operator" }), el("th", { scope: "col", text: "Operator’s answer" })
         ])]),
-        el("tbody", {}, rows)
+        el("tbody", {}, dueRows)
       ]),
       cond.length ? el("p", { class: "b-key", text: "Depending on what the survey finds:" }) : null,
       cond.length ? el("ul", { class: "b-cond" }, cond) : null,
-      el("p", { class: "b-key", text: "Due date = date the notice arrived + the rule’s calendar days, not moved for weekends or holidays (the rule does not say); confirm with CARB. Duties start only with CARB’s notice (§ 95469(b), p. 26)." })
+      cond.length ? el("p", { class: "b-ask" }, [el("strong", { text: "Ask: " }), "What did the survey find, and when was each problem fixed, re-tested and reported?"]) : null,
+      el("p", { class: "b-key", text: "Due = notice date + the rule’s calendar days, with no weekend or holiday shift (the rule is silent). Confirm with CARB." })
     ]));
-  } else {
-    var duties = el("div", { class: "b-duties" });
-    sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-duty-title" }, [
-      el("h2", { id: "b-duty-title", text: "What California’s 2027 rule asks after a CARB notice" }),
-      duties
-    ]));
-    window.LMBChecklist.render(duties, { compact: true });
   }
 
-  // caveats and credits
+  // ---------- chart ----------
+  var chartBox = el("div", { class: "b-chart" });
+  sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-chart-title" }, [
+    el("div", { class: "b-block-head" }, [
+      el("h2", { id: "b-chart-title", text: emptyWindow || range === "all" ? "Every published detection" : "Published detections, last " + D.recent_months + " months" }),
+      el("p", { class: "b-key", text: "Dot: estimated rate. Bar: ± uncertainty. Square: no published rate. A gap means no published pass, not no leak." })
+    ]),
+    chartBox
+  ]));
+  var chartRange = range === "recent" && !emptyWindow ? { from: D.recent_since, to: D.fetched_at.slice(0, 10) } : {};
+  function drawChart(h) {
+    window.LMBChart.render(chartBox, shown, Object.assign({ width: 760, height: h, suffix: "-brief" }, chartRange));
+  }
+  var chartH = 150;
+  drawChart(chartH);
+
+  // ---------- most recent detections: specifics an operator can check against site records ----------
+  var newest = shown.plumes.slice().reverse();
+  var detBody = el("tbody");
+  var detNote = el("p", { class: "b-key" });
+  var detTable;
+  function drawDetections(n) {
+    detBody.textContent = "";
+    // last resort on a crowded follow-up page: one line instead of the table
+    if (detTable) detTable.hidden = n === 0;
+    if (n === 0) {
+      var p0 = newest[0];
+      detNote.textContent = p0 ? "Latest: " + L.fmtDate(p0.date) + ", " + (p0.rate_kg_h == null ? "rate not published" : L.fmtRateUnc(p0.rate_kg_h, p0.uncertainty_kg_h)) +
+        ", " + L.platform(p0.platform).label + ". The full list is in the app." : "";
+      return;
+    }
+    newest.slice(0, n).forEach(function (p) {
+      detBody.appendChild(el("tr", {}, [
+        el("td", { class: "b-nowrap", text: L.fmtDate(p.date) }),
+        el("td", { class: "num b-nowrap", text: p.rate_kg_h == null ? "not published" : L.fmtRate(p.rate_kg_h) + (p.uncertainty_kg_h != null ? " ± " + L.fmtRate(p.uncertainty_kg_h) : "") }),
+        el("td", { text: L.platform(p.platform).label }),
+        el("td", { class: "num b-nowrap", text: p.lat.toFixed(4) + ", " + p.lon.toFixed(4) }),
+        el("td", { class: "num", text: p.km_from_center.toFixed(1) })
+      ]));
+    });
+    var shownN = Math.min(n, newest.length);
+    detNote.textContent = shownN < newest.length
+      ? "The " + shownN + " most recent of " + newest.length + ". The full list, with Carbon Mapper plume IDs, is in the app."
+      : "All " + newest.length + " detection" + (newest.length === 1 ? "" : "s") + (range === "recent" && !emptyWindow ? " in the window" : "") + ". Plume IDs are in the app.";
+  }
+  sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-det-title" }, [
+    el("div", { class: "b-block-head" }, [el("h2", { id: "b-det-title", text: "Most recent detections" }), detNote]),
+    detTable = el("table", { class: "b-table b-det-table" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { scope: "col", text: "Observed" }), el("th", { scope: "col", class: "num", text: "Rate, kg/h" }),
+        el("th", { scope: "col", text: "Seen by" }), el("th", { scope: "col", class: "num", text: "Plume location" }),
+        el("th", { scope: "col", class: "num", text: "Km from centre" })
+      ])]),
+      detBody
+    ])
+  ]));
+  var detRows = notice ? 6 : 10;
+  drawDetections(detRows);
+
+  // ---------- without a notice: what to do with this page ----------
+  if (!notice) {
+    var big = shown.max_rate_date ? L.fmtDate(shown.max_rate_date) : null;
+    sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-next-title" }, [
+      el("h2", { id: "b-next-title", text: "Next steps" }),
+      el("ol", { class: "b-next" }, [
+        el("li", { text: "Check CARB’s CalSMP dashboard for a plume notification to this landfill’s operator. Only CARB’s notice starts the operator’s duties under the 2027 rule (§ 95469(b), p. 26)." }),
+        el("li", { text: "If there is one, open this landfill in the app, enter the date the notice arrived, and print the follow-up version: due dates, the rule for each step, and what to ask." }),
+        el("li", { text: "In the meantime, ask the operator what was happening on site on these dates" + (big ? ", including the largest detection, on " + big : "") + ", and whether their own monitoring found anything near those locations." })
+      ])
+    ]));
+  }
+
+  // ---------- notes ----------
   var lag = D.publication_lag_days;
-  sheet.appendChild(el("section", { class: "b-block b-caveats", "aria-labelledby": "b-cav-title" }, [
-    el("h2", { id: "b-cav-title", text: "Read this before using the numbers" }),
-    el("ul", {}, [
-      el("li", { text: "Informational only, not legal advice or an official CARB determination. This brief does not assess whether the operator is meeting the rule." }),
-      el("li", { text: "Only a CARB notification starts the operator’s duties. Check notification status on CARB’s CalSMP dashboard." }),
-      el("li", { text: "Public data lags: plumes are published about 30 days after observation (median " + lag.median + " days in this data), so this is a history, not an alert." }),
-      el("li", { text: "A plume near a landfill may come from a neighbouring source. " +
-        (site.plume_count === 1 ? "This site has a single detection, a weak basis for attribution. "
-          : "Detections here lie up to " + Math.max(0.1, site.max_km_from_center).toFixed(1) + " km from the site centre. ") +
-        (site.nearby_other_sector ? site.nearby_other_sector + " nearby plume" + (site.nearby_other_sector === 1 ? " was" : "s were") + " classed as non-waste and not counted. " : "") +
-        (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? "The named facility is a closed landfill; treat the match with care. " : "") +
-        (site.outlying_groups ? site.outlying_detections + " detection" + (site.outlying_detections === 1 ? " lies" : "s lie") + " more than 1 km from the main group and " + (site.outlying_detections === 1 ? "is" : "are") + " counted as part of this landfill. " : "") +
-        (!site.official_name && site.nearest_record ? "No registered landfill lies within 3 km; the nearest EPA record is " + site.nearest_record.name + ", " + site.nearest_record.distance_km.toFixed(1) + " km away. " : "") +
-        "Rates are estimates with the uncertainty shown." })
+  var attribution = (site.plume_count === 1 ? "A single detection is a weak basis for attribution. "
+      : "Detections here lie up to " + Math.max(0.1, site.max_km_from_center).toFixed(1) + " km from the site centre. ") +
+    (site.outlying_groups ? site.outlying_detections + " lie more than 1 km from the main group and are counted here. " : "") +
+    (site.nearby_other_sector ? site.nearby_other_sector + " nearby plume" + (site.nearby_other_sector === 1 ? " was" : "s were") + " classed as non-waste and not counted. " : "") +
+    (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? "The named facility is a closed landfill. " : "") +
+    (!site.official_name && site.nearest_record ? "No registered landfill lies within 3 km; the nearest EPA record is " + site.nearest_record.name + ", " + site.nearest_record.distance_km.toFixed(1) + " km away. " : "");
+  function note(label, text) { return el("div", {}, [el("dt", { text: label }), el("dd", { text: text })]); }
+  sheet.appendChild(el("section", { class: "b-block b-notes", "aria-labelledby": "b-notes-title" }, [
+    el("h2", { id: "b-notes-title", text: "Notes on the data" }),
+    el("dl", {}, [
+      note("Not a finding", "Informational only. Not legal advice or a CARB determination, and it does not assess whether the operator is meeting the rule."),
+      note("Not an alert", "Plumes are published about 30 days after observation (median " + lag.median + " days here). Check CalSMP for current status."),
+      note("Attribution", "A plume near a landfill may come from a neighbouring source. " + attribution.trim()),
+      note("Coverage", "Detections follow when aircraft and satellites flew over; satellites see only larger leaks. Rates are estimates with the uncertainty shown.")
     ])
   ]));
   var nameSource = !site.name_source_url ? "not matched to a registered facility."
@@ -172,8 +226,8 @@
     el("p", { text: "CalSMP dashboard: " + L.LINKS.calsmp })
   ]));
 
-  // Keep the brief on one US Letter page: if the content is taller than the page,
-  // shorten the chart, then tighten spacing. Measured at the printed width.
+  // Keep the brief on one US Letter page: if the content is taller than the page, show fewer
+  // detection rows, then shorten the chart, then tighten spacing. Measured at the printed width.
   function pageHeightPx() {
     var probe = el("div", { style: "position:absolute;visibility:hidden;height:11in;width:1px" });
     document.body.appendChild(probe);
@@ -193,16 +247,38 @@
   function fit() {
     var limit = pageHeightPx() - 4;
     sheet.classList.remove("is-tight");
-    chartH = 160;
-    drawChart(chartH);
-    var minChart = notice ? 110 : 130; // the follow-up table needs more room than the checklist
-    while (contentHeight() > limit && chartH > minChart) {
-      chartH -= 10;
-      drawChart(chartH);
-    }
-    if (contentHeight() > limit) sheet.classList.add("is-tight");
     sheet.classList.remove("is-tighter");
-    if (contentHeight() > limit) sheet.classList.add("is-tighter");
+    var maxRows = notice ? 6 : 10;
+    detRows = maxRows;
+    drawDetections(detRows);
+    chartH = 150;
+    drawChart(chartH);
+    var over = function () { return contentHeight() > limit; };
+    // Cheapest first: tighter spacing keeps all the content. Then fewer rows and a shorter
+    // chart (never under 130 px, so it stays readable), then smaller type, and as a last
+    // resort the detection table becomes one line.
+    if (over()) sheet.classList.add("is-tight");
+    while (over() && detRows > 5) { detRows -= 1; drawDetections(detRows); }
+    while (over() && chartH > 130) { chartH -= 10; drawChart(chartH); }
+    while (over() && detRows > 3) { detRows -= 1; drawDetections(detRows); }
+    if (over()) sheet.classList.add("is-tighter");
+    if (over()) { detRows = 0; drawDetections(0); }
+    while (over() && chartH > 110) { chartH -= 10; drawChart(chartH); }   // very last: a short chart (2 y labels)
+    // Then give back what still fits: chart height first, then rows.
+    while (detRows > 0 && chartH < 150) { drawChart(chartH + 10); if (over()) { drawChart(chartH); break; } chartH += 10; }
+    while (detRows > 0 && detRows < maxRows) { drawDetections(detRows + 1); if (over()) { drawDetections(detRows); break; } detRows += 1; }
+    // Normal-size type matters more than an extra row: undo the smaller type if dropping rows (to 3) makes room.
+    if (sheet.classList.contains("is-tighter") && detRows > 0) {
+      var keepRows = detRows, keepChart = chartH;
+      sheet.classList.remove("is-tighter");
+      while (over() && detRows > 3) { detRows -= 1; drawDetections(detRows); }
+      while (over() && chartH > 130) { chartH -= 10; drawChart(chartH); }
+      if (over()) {
+        sheet.classList.add("is-tighter");
+        detRows = keepRows; drawDetections(keepRows);
+        chartH = keepChart; drawChart(keepChart);
+      }
+    }
   }
   fit();
   // Measure again once the real font is in: fallback monospace sets wider and taller.

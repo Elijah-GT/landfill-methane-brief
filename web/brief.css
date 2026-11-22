@@ -61,48 +61,64 @@ body { font-variant-numeric: tabular-nums; background: var(--color-paper-2); }
 
 .b-years { font-size: var(--pt-sm); color: var(--color-ink-2); }
 
-/* compact checklist: balanced columns; a duty never splits across columns */
-.b-duties { columns: 2; column-gap: 14pt; }
-.b-duties .sign { column-span: all; margin-bottom: 6pt; background: var(--color-ink); color: var(--color-paper); padding: 5pt 8pt; display: flex; flex-wrap: wrap; gap: 2pt 8pt; align-items: baseline; }
-.b-duties .sign-head { font-weight: 800; color: var(--color-accent-2); }
-.b-duties .sign-text { flex: 1 1 24em; }
-.b-duties .sign a { color: var(--color-paper); }
-.b-duties .duty-group { margin-bottom: 6pt; }
-.b-duties .duty-group-title { font-size: var(--pt-sm); border-bottom: var(--rule-bar) solid var(--color-ink); padding-bottom: 1pt; break-after: avoid; }
-.b-duties .duties { list-style: none; margin: 0; padding: 0; }
-.b-duties .duty { padding: 2pt 0; border-bottom: var(--rule-hair) solid var(--color-rule); font-size: var(--pt-md); line-height: 1.3; break-inside: avoid; }
-.b-duties .duty p { display: inline; }
-.b-duties .duty-when { font-weight: 800; }
-.b-duties .duty-when::after { content: ". "; }
-.b-duties .duty-cite::before { content: " "; }
-.b-duties .cite { color: var(--color-ink-2); }
+/* key figures: four cells on one rule, like the app's stats */
+.b-figs { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: var(--rule-hair) solid var(--color-rule); padding-bottom: 5pt; }
+.b-fig { padding: 0 8pt; border-left: var(--rule-hair) solid var(--color-rule); min-width: 0; }
+.b-fig:first-child { padding-left: 0; border-left: 0; }
+.b-fig dt { font-size: var(--pt-sm); color: var(--color-muted); font-weight: 500; }
+.b-fig dd { margin: 0; }
+.b-fig-num { font-size: 15pt; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.b-fig-unit { font-size: var(--pt-sm); font-weight: 500; }
+.b-fig-sub { font-size: var(--pt-xs); color: var(--color-ink-2); line-height: 1.25; }
+.b-alert { font-size: var(--pt-sm); padding: 3pt 6pt; border-left: var(--rule-bar) solid var(--color-ink); }
+.b-block-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2pt 12pt; }
 
-.b-due-table { width: 100%; border-collapse: collapse; font-size: var(--pt-sm); line-height: 1.3; }
-.b-due-table th { text-align: left; font-weight: 800; border-bottom: var(--rule-bar) solid var(--color-ink); padding: 1pt 6pt 1pt 0; }
-.b-due-table td { vertical-align: top; border-bottom: var(--rule-hair) solid var(--color-rule); padding: 3pt 6pt 3pt 0; }
+/* tables on paper */
+.b-table { width: 100%; border-collapse: collapse; font-size: var(--pt-sm); line-height: 1.3; }
+.b-table th { white-space: nowrap; text-align: left; font-weight: 800; border-bottom: var(--rule-bar) solid var(--color-ink); padding: 1pt 6pt 1pt 0; }
+.b-table td { vertical-align: top; border-bottom: var(--rule-hair) solid var(--color-rule); padding: 2pt 6pt 2pt 0; }
+.b-table .num { text-align: right; }
+.b-nowrap { white-space: nowrap; }
+.b-det-table th:nth-child(1) { width: 17%; }
+.b-det-table th:nth-child(2) { width: 19%; }
+.b-det-table th:nth-child(4) { width: 22%; }
+.b-det-table th:nth-child(5) { width: 15%; }
+.b-det-table td:nth-child(3) { padding-left: 12pt; }
+.b-det-table th:nth-child(3) { padding-left: 12pt; }
+
+/* next steps and notes */
+.b-next { margin: 0; padding-left: 13pt; display: grid; gap: 2pt; font-size: var(--pt-md); line-height: 1.3; }
+.b-notes dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2pt 10pt; font-size: var(--pt-sm); line-height: 1.3; }
+.b-notes dl > div { display: contents; }
+.b-notes dt { font-weight: 800; }
+.b-notes dd { margin: 0; color: var(--color-ink-2); }
+
+.b-due-table td { padding-top: 3pt; padding-bottom: 3pt; }
 .b-due-table .b-due { font-weight: 800; white-space: nowrap; }
 .b-due-table th:nth-child(2) { width: 34%; }
 .b-due-table th:nth-child(3) { width: 30%; }
 .b-due-table .b-answer { width: 24%; border-bottom: var(--rule-hair) solid var(--color-ink-2); }
 .b-due-table .cite { color: var(--color-ink-2); }
+.b-ask { font-size: var(--pt-sm); }
 .b-cond { margin: 0; padding-left: 10pt; display: grid; gap: 1pt; font-size: var(--pt-sm); line-height: 1.3; }
 .b-cond .cite { color: var(--color-ink-2); }
-.b-caveats ul { margin: 0; padding-left: 10pt; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2pt 22pt; font-size: var(--pt-md); line-height: 1.3; }
 .b-foot { margin-top: auto; padding-top: 4pt; border-top: var(--rule-hair) solid var(--color-ink); font-size: var(--pt-xs); color: var(--color-ink-2); display: grid; gap: 1pt; overflow-wrap: anywhere; }
 
 .state { display: grid; gap: var(--space-sm); }
 .sheet.is-tight { gap: 4pt; line-height: 1.25; }
 .sheet.is-tight .b-due-table td { padding-top: 2pt; padding-bottom: 2pt; line-height: 1.22; }
 .sheet.is-tight .b-cond { line-height: 1.22; }
-.sheet.is-tighter .b-due-table, .sheet.is-tighter .b-cond, .sheet.is-tighter .b-caveats ul { font-size: var(--pt-xs); }
-.sheet.is-tight .b-duties .duty { line-height: 1.22; padding: 1pt 0; }
+.sheet.is-tight .b-table td { line-height: 1.22; }
+.sheet.is-tighter .b-table, .sheet.is-tighter .b-cond, .sheet.is-tighter .b-notes dl, .sheet.is-tighter .b-next, .sheet.is-tighter .b-ask, .sheet.is-tighter .b-key, .sheet.is-tighter .b-alert { font-size: var(--pt-xs); }
+.sheet.is-tighter .b-alert { padding-top: 1pt; padding-bottom: 1pt; }
+.sheet.is-tighter { gap: 3pt; }
 
 @page { size: letter; margin: 0; }
 @media print {
   body { background: none; }
   .toolbar { display: none; }
   .sheet { margin: 0; border: 0; width: var(--page-w); height: var(--page-h); min-height: 0; }
-  .chart-dot, .b-duties .sign, .chart-withheld { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .chart-dot, .chart-withheld { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   a { text-decoration: none; }
 }
 /* The sheet always keeps its printed width so screen and paper match; on a

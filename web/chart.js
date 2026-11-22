@@ -13,15 +13,16 @@
   }
 
   // Axis scale: a tick step of 1, 2, 2.5 or 5 x 10^n, with 3 to 5 intervals.
-  function niceScale(v) {
-    if (!(v > 0)) return { top: 100, n: 4 };
+  function niceScale(v, maxN) {
+    maxN = maxN || 5;
+    if (!(v > 0)) return { top: 100, n: Math.min(4, maxN) };
     var mag = Math.pow(10, Math.floor(Math.log10(v)) - 1);
     var mult = [1, 2, 2.5, 5, 10, 20, 25, 50, 100];
     for (var i = 0; i < mult.length; i++) {
       var step = mult[i] * mag, n = Math.ceil(v / step);
-      if (n <= 5) return { top: n * step, n: Math.max(n, 1) };
+      if (n <= maxN) return { top: n * step, n: Math.max(n, 1) };
     }
-    return { top: 100 * mag * 5, n: 5 };
+    return { top: 100 * mag * maxN, n: maxN };
   }
 
   // Detections on the same day share an x position; spread them a few pixels
@@ -70,9 +71,10 @@
     else { x0 = Date.UTC(+site.first_date.slice(0, 4), 0, 1); x1 = Date.UTC(+site.last_date.slice(0, 4) + 1, 0, 1); }
     var firstYear = new Date(x0).getUTCFullYear(), lastYear = new Date(x1 - 1).getUTCFullYear();
     var rated = site.plumes.filter(function (p) { return p.rate_kg_h != null; });
+    // fewer y labels on a short plot so they never collide (about 20 px per label)
     var scale = niceScale(Math.max.apply(null, [0].concat(rated.map(function (p) {
       return p.rate_kg_h + (p.uncertainty_kg_h || 0);
-    }))));
+    }))), ph < 60 ? 2 : ph < 90 ? 3 : 5);
     var top = scale.top;
     var X = function (ms) { return m.l + (ms - x0) / (x1 - x0) * pw; };
     var Y = function (v) { return m.t + ph - v / top * ph; };

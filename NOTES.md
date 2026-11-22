@@ -21,6 +21,12 @@ Not merged into `main`; the submitted site stays the Sacramento-region version u
 * All 53 briefs were printed to PDF with headless Chrome: each is exactly one US Letter page.
 * Unnamed sites now get IDs from their coordinates (`site-37-755-121-647`), so links survive a refresh.
 
+## Brief redesign (statewide branch)
+
+* Question asked: what is the printed page for? Two readers: a manager who needs the picture quickly, and the operator across the table, who needs specifics they can check. The general duty summary was removed from the brief (it stays in the app); the caveat bullets became four labelled notes.
+* Layout: header, four key figures, the follow-up table when a notice is entered, the chart, the most recent detections (date, rate ± uncertainty, instrument, plume coordinates, distance from centre), next steps when there is no notice, notes, sources.
+* Fitting to one page, in order: tighter spacing, fewer detection rows (to 5), a shorter chart (never under 130 px), fewer rows (to 3), smaller type, and as a last resort the detection table becomes one line; then chart height and rows are given back while they fit, and normal-size type is preferred over extra rows. Short charts use fewer y-axis labels so they never collide.
+
 ## After-notice follow-up (statewide branch)
 
 * Job: once CARB has notified an operator, show the analyst what is due when and what to ask. Enter the receipt date, landfill type (controlled, uncontrolled, not sure) and optional CARB ID; the state lives in the URL (`&notice=YYYY-MM-DD&type=…&carb=…`) and carries into the brief.
