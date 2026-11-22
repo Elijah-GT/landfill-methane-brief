@@ -43,7 +43,15 @@ h3 { font-size: var(--text-md); }
 .rail-title { font-size: var(--text-lg); }
 .rail-note { color: var(--color-ink-2); font-size: var(--text-sm); }
 
+.map-wrap { display: grid; gap: var(--space-xs); min-width: 0; }
+.map-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+.map-title { font-size: var(--text-sm); font-weight: 500; color: var(--color-ink-2); line-height: 1.4; }
+.btn--small { min-height: 36px; padding: 0 var(--space-md); font-size: var(--text-xs); white-space: nowrap; flex-shrink: 0; }
 .map { height: 240px; border: var(--rule-bar) solid var(--color-ink); background: var(--color-paper-2); z-index: var(--z-base); }
+/* Expanded: the map fills the window above the page; Escape, the button or picking a site closes it. */
+.map-wrap.is-expanded { position: fixed; inset: 0; z-index: var(--z-modal); background: var(--color-paper); padding: var(--space-md); grid-template-rows: auto minmax(0, 1fr); }
+.map-wrap.is-expanded .map { height: auto; }
+.map-wrap.is-expanded .map-title { font-size: var(--text-lg); font-weight: 800; color: var(--color-ink); }
 .map .leaflet-tile-pane { filter: grayscale(1) contrast(0.92); }
 .map .site-marker { fill: var(--color-accent); fill-opacity: 0.5; stroke: var(--color-ink); cursor: pointer; }
 .map .site-marker.is-current { fill: var(--color-accent-2); fill-opacity: 1; }

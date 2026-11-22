@@ -14,7 +14,7 @@
     if (kind === "error") attrs.role = "alert";
     detailEl.appendChild(L.el("div", attrs, [L.el("h1", { text: head }), L.el("p", { text: msg })]));
     listEl.textContent = "";
-    document.getElementById("map").hidden = true;
+    document.getElementById("map-wrap").hidden = true;
   }
 
   if (!D) {
@@ -48,7 +48,7 @@
 
   function initMap() {
     var box = document.getElementById("map");
-    if (!window.L || !window.L.map) { box.hidden = true; return; }
+    if (!window.L || !window.L.map) { document.getElementById("map-wrap").hidden = true; return; }
     map = window.L.map(box, { scrollWheelZoom: false, attributionControl: true, zoomSnap: 0.25, keyboard: false });
     window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"
@@ -64,6 +64,35 @@
       bounds.push([s.lat, s.lon]);
     });
     map.fitBounds(bounds, { padding: [24, 24] });
+    initMapToggle(bounds);
+  }
+
+  // Expand the map to fill the window. The rest of the page is made inert while it is open,
+  // so Tab stays on the map's controls. Escape, the button or picking a site closes it.
+  var mapOpen = false;
+  function setMapExpanded(open, bounds, keepFocus) {
+    var wrap = document.getElementById("map-wrap");
+    var btn = document.getElementById("map-toggle");
+    mapOpen = open;
+    wrap.classList.toggle("is-expanded", open);
+    btn.setAttribute("aria-expanded", String(open));
+    btn.textContent = open ? "Close map" : "Expand map";
+    var outside = document.querySelectorAll(".bar, .skip, #detail, .about, .foot, .rail-title, .rail-note, #site-list");
+    Array.prototype.forEach.call(outside, function (n) { n.inert = open; });
+    if (open) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable();
+    map.invalidateSize();
+    map.fitBounds(bounds, { padding: open ? [48, 48] : [24, 24] });
+    if (!keepFocus) btn.focus();
+  }
+  function initMapToggle(bounds) {
+    var btn = document.getElementById("map-toggle");
+    btn.hidden = false;
+    btn.addEventListener("click", function () { setMapExpanded(!mapOpen, bounds); });
+    document.addEventListener("keydown", function (e) {
+      if (mapOpen && e.key === "Escape") setMapExpanded(false, bounds);
+    });
+    // Picking a site on the big map closes it so the site's details show (route() then moves focus).
+    window.addEventListener("hashchange", function () { if (mapOpen) setMapExpanded(false, bounds, true); });
   }
 
   // ---------- detail ----------

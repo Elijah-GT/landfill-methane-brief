@@ -27,7 +27,13 @@
       <div class="rail-inner">
       <h2 id="rail-title" class="rail-title">Landfills in the Sacramento region</h2>
       <p class="rail-note" id="rail-note">Waste-sector methane plumes seen from aircraft and satellites, grouped into sites.</p>
-      <div id="map" class="map" role="region" aria-label="Map of the landfill sites; the list below has the same sites"></div>
+      <div id="map-wrap" class="map-wrap">
+        <div class="map-head">
+          <h2 class="map-title">Map of the landfill sites</h2>
+          <button type="button" id="map-toggle" class="btn btn--small" aria-expanded="false" aria-controls="map-wrap" hidden>Expand map</button>
+        </div>
+        <div id="map" class="map" role="region" aria-label="Map of the landfill sites; the list below has the same sites"></div>
+      </div>
       <ol id="site-list" class="site-list" aria-label="Landfills, most detections first">
         <li class="site-skeleton" aria-hidden="true"></li>
         <li class="site-skeleton" aria-hidden="true"></li>
