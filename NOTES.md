@@ -21,6 +21,13 @@ Not merged into `main`; the submitted site stays the Sacramento-region version u
 * All 53 briefs were printed to PDF with headless Chrome: each is exactly one US Letter page.
 * Unnamed sites now get IDs from their coordinates (`site-37-755-121-647`), so links survive a refresh.
 
+## Recent window (statewide branch)
+
+* The app and brief open on the 24 months before the fetch date (`recent_since` = 2024-11-22 for this snapshot; `build_sites.recent_since`, tested including Feb 29). Each site carries `recent` statistics computed by the same `site_stats` as the full record; the site's location stays the full-record centre.
+* Why: the full record is shaped by flight campaigns (2024 alone is 1,516 of 2,707 detections, mostly April and June aircraft flights), and instruments differ in what they can see (median detected rate 244 kg/h for AVIRIS-NG, 545 for Tanager-1, 1,423 for EMIT). Recent detections are 207 satellite and 42 aircraft.
+* In the window: 249 detections at 35 of 53 sites. The other 18 are listed below them as "None since Nov 22, 2024" with hollow map markers, and their page and brief say no plume was published, not that nothing leaked; the brief then shows the full history.
+* The full history is one click away (`#site=<id>&range=all`), and the choice carries into the brief.
+
 ## Verified (first-hour gate)
 
 | Check | Result | Source |

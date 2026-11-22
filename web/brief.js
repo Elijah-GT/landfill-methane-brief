@@ -19,11 +19,17 @@
   var site = L.siteById(L.siteIdFromHash());
   if (!site) { fail("No landfill selected", "Open this brief from a landfill in the app, so the address ends with #site= and the landfill’s id."); return; }
 
-  document.getElementById("back").setAttribute("href", "index.html#site=" + site.id);
+  var range = D.recent_since ? L.rangeFromHash() : "all";
+  document.getElementById("back").setAttribute("href", "index.html" + L.hashFor(site.id, range));
   document.title = "Methane brief: " + site.name;
 
-  var kinds = L.kindCounts(site);
-  var withheld = site.plume_count - site.quantified_count;
+  // The brief follows the range chosen in the app. With no detections in the recent window,
+  // it says so and shows the full history instead, so the page is never blank.
+  var v = L.view(site, range);
+  var emptyWindow = range === "recent" && !v.plume_count;
+  var shown = emptyWindow ? L.view(site, "all") : v;
+  var kinds = L.kindCounts(shown);
+  var withheld = shown.plume_count - shown.quantified_count;
   var now = new Date();
   var today = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0"); // local date, not UTC
 
@@ -44,34 +50,51 @@
     el("dl", { class: "b-dates" }, [
       row("Prepared", L.fmtDate(today)),
       row("Data fetched", L.fmtDate(D.fetched_at)),
+      row("Period", range === "all" ? "Full record since " + L.fmtDate(site.first_date)
+        : "Last " + D.recent_months + " months, since " + L.fmtDate(D.recent_since)),
       row("Detections through", L.fmtDate(site.last_date))
     ])
   ]));
 
   // summary sentence
   var who = kinds.aircraft && kinds.space ? "aircraft and satellites" : kinds.space ? (kinds.space === 1 ? "a satellite" : "satellites") : (kinds.aircraft === 1 ? "an aircraft" : "aircraft");
-  var when = site.first_date === site.last_date ? "On " + L.fmtDate(site.first_date)
-    : "Between " + L.fmtDate(site.first_date) + " and " + L.fmtDate(site.last_date);
-  var summary = when + ", " + who + " detected " + L.plural(site.plume_count, "methane plume") + " at this site" +
-    (kinds.aircraft && kinds.space ? " (" + kinds.aircraft + " from aircraft, " + kinds.space + " from satellites)" : "") + ". ";
-  if (site.quantified_count === 1) {
-    summary += "Its published rate was " + L.fmtRateUnc(site.max_rate_kg_h, site.max_rate_uncertainty_kg_h) + ". ";
-  } else if (site.quantified_count > 1) {
-    summary += "The median published rate was " + L.fmtRate(site.median_rate_kg_h) + " kg/h; the largest was " +
-      L.fmtRateUnc(site.max_rate_kg_h, site.max_rate_uncertainty_kg_h) + " on " + L.fmtDate(site.max_rate_date) + ". ";
+  var summary = "";
+  if (emptyWindow) {
+    summary = "No plume was published at this site in the " + D.recent_months + " months to " + L.fmtDate(D.fetched_at) +
+      ". That does not mean nothing leaked: it may not have been flown over. The last detection was on " + L.fmtDate(site.last_date) +
+      "; the full record below has " + L.plural(site.plume_count, "detection") + " since " + L.fmtDate(site.first_date) + ". ";
+  } else {
+    var when = shown.first_date === shown.last_date ? "On " + L.fmtDate(shown.first_date)
+      : "Between " + L.fmtDate(shown.first_date) + " and " + L.fmtDate(shown.last_date);
+    summary = when + ", " + who + " detected " + L.plural(shown.plume_count, "methane plume") + " at this site" +
+      (kinds.aircraft && kinds.space ? " (" + kinds.aircraft + " from aircraft, " + kinds.space + " from satellites)" : "") + ". ";
+    if (shown.quantified_count === 1) {
+      summary += "Its published rate was " + L.fmtRateUnc(shown.max_rate_kg_h, shown.max_rate_uncertainty_kg_h) + ". ";
+    } else if (shown.quantified_count > 1) {
+      summary += "The median published rate was " + L.fmtRate(shown.median_rate_kg_h) + " kg/h; the largest was " +
+        L.fmtRateUnc(shown.max_rate_kg_h, shown.max_rate_uncertainty_kg_h) + " on " + L.fmtDate(shown.max_rate_date) + ". ";
+    }
+    if (withheld) summary += L.plural(withheld, "detection") + " had no published rate. ";
+    if (range === "recent" && site.plume_count > shown.plume_count) {
+      summary += "The full record since " + L.fmtDate(site.first_date) + " has " + L.plural(site.plume_count, "detection") + ".";
+    }
   }
-  if (withheld) summary += L.plural(withheld, "detection") + " had no published rate.";
-  sheet.appendChild(el("p", { class: "b-summary", text: summary }));
+  sheet.appendChild(el("p", { class: "b-summary", text: summary.trim() }));
 
   // chart + per-year
   var chartBox = el("div", { class: "b-chart" });
   sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-chart-title" }, [
-    el("h2", { id: "b-chart-title", text: "Every published detection" }),
+    el("h2", { id: "b-chart-title", text: emptyWindow ? "Every published detection (none in the last " + D.recent_months + " months)"
+      : range === "recent" ? "Published detections in the last " + D.recent_months + " months" : "Every published detection" }),
     el("p", { class: "b-key", text: "Dot: estimated rate (same-day dots spread). Bar: ± uncertainty. Square: no published rate. Gap: no published pass." }),
     chartBox
   ]));
+  var chartRange = range === "recent" && !emptyWindow ? { from: D.recent_since, to: D.fetched_at.slice(0, 10) } : {};
+  function drawChart(h) {
+    window.LMBChart.render(chartBox, shown, Object.assign({ width: 760, height: h, suffix: "-brief" }, chartRange));
+  }
   var chartH = 160;
-  window.LMBChart.render(chartBox, site, { width: 760, height: chartH, suffix: "-brief" });
+  drawChart(chartH);
 
   // checklist
   var duties = el("div", { class: "b-duties" });
@@ -128,10 +151,10 @@
     var limit = pageHeightPx() - 4;
     sheet.classList.remove("is-tight");
     chartH = 160;
-    window.LMBChart.render(chartBox, site, { width: 760, height: chartH, suffix: "-brief" });
+    drawChart(chartH);
     while (contentHeight() > limit && chartH > 130) {
       chartH -= 10;
-      window.LMBChart.render(chartBox, site, { width: 760, height: chartH, suffix: "-brief" });
+      drawChart(chartH);
     }
     if (contentHeight() > limit) sheet.classList.add("is-tight");
   }

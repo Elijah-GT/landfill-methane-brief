@@ -11,7 +11,7 @@ From January 1, 2027, California landfill operators must investigate and fix met
 ## What it does
 
 1. **Pick a landfill.** The app groups 2,707 waste-sector methane plumes seen in California (Sep 2016 to Oct 2026) into 53 sites, names 41 of them from EPA and CalRecycle records, and shows them on a searchable list and a map that expands to fill the window.
-2. **See its history.** Count, date range, median and largest emission rate with its published uncertainty, and a timeline with one dot per detection and an uncertainty bar. Detections whose rate was not published are shown, not dropped.
+2. **See recent activity first, history on request.** By default every number, the list order, the map and the chart cover the last 24 months before the data was fetched (since Nov 22, 2024 in this snapshot); a switch shows the full record since 2016. Count, date range, median and largest emission rate with its published uncertainty, and a timeline with one dot per detection and an uncertainty bar. Detections whose rate was not published are shown, not dropped.
 3. **See what the 2027 rule asks after a CARB notice.** Eleven operator duties, plus the notice that triggers them, each with its deadline, its section number linked to the page of the regulation, and the verbatim regulation text.
 4. **Generate a brief.** A print-ready, one-page US Letter brief with data dates, the 30-day publication lag, caveats and credits. Print it or save it as a PDF.
 
@@ -95,6 +95,7 @@ web/data/checklist.js (hand-built from the regulation) ─>  brief.html (one pri
 * **Rates are estimates.** Each carries Carbon Mapper's published ± uncertainty. Carbon Mapper does not say whether that is one standard deviation or a 95% interval. 647 of the 2,707 waste-sector plumes have no published rate.
 * **Only waste-sector plumes count.** Plumes Carbon Mapper classed as another sector are left out even when they sit inside a site ; each site says how many.
 * **Possible duplicates.** A few detections share a scene and position (for example two at Potrero Hills on Jun 17, 2017); they are counted as Carbon Mapper lists them.
+* **Totals follow flight campaigns.** 56% of all detections come from 2024, mostly two months of aircraft flights, and older years are aircraft-only while recent ones are mostly satellite (which see only larger leaks). That is why the app opens on the last 24 months; compare full-history counts between sites with care.
 * **Coverage is uneven.** Aircraft and satellites saw each site only when they passed over, so a year with no dots is not a year without leaks.
 * **The user is assumed, not validated.** The tool is designed for a city or county analyst, but has not been tested with one.
 

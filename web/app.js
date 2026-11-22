@@ -26,26 +26,69 @@
     return;
   }
 
-  // ---------- rail: note, list, map ----------
-  document.getElementById("rail-note").textContent =
-    L.plural(D.waste_plumes, "waste-sector plume") + " seen from aircraft and satellites between " +
-    L.fmtDate(D.waste_oldest_observation || D.oldest_observation) + " and " + L.fmtDate(D.waste_newest_observation || D.newest_observation) +
-    ", grouped into sites where detections fall within " + D.cluster_km + " km of each other.";
+  // ---------- rail: range, note, list, map ----------
+  var range = D.recent_since ? L.rangeFromHash() : "all";
+  var currentSite = null;
+  var applyFilter = null;
+  var keepFocus = false;
+  var rangeEl = document.getElementById("range");
+  if (D.recent_since) {
+    rangeEl.hidden = false;
+    rangeEl.querySelector('[data-range="recent"]').textContent = "Last " + D.recent_months + " months";
+    rangeEl.querySelector('[data-range="all"]').textContent = "Full history, since " + (D.waste_oldest_observation || "").slice(0, 4);
+    Array.prototype.forEach.call(rangeEl.querySelectorAll(".range-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var id = (currentSite && currentSite.id) || D.sites[0].id;
+        keepFocus = true; // switching range keeps focus on the switch, unlike picking a site
+        window.location.hash = L.hashFor(id, btn.getAttribute("data-range")).slice(1);
+      });
+    });
+  }
 
-  listEl.textContent = "";
-  D.sites.forEach(function (s) {
-    var btn = L.el("a", { class: "site", href: "#site=" + s.id, "data-site": s.id }, [
-      L.el("span", { class: "site-name", text: s.name }),
-      L.el("span", { class: "site-sub", text: s.county || (s.nearest_record ? "Unmatched; " + s.nearest_record.distance_km + " km from " + s.nearest_record.name : "No registered landfill within 10 km") }),
-      L.el("span", { class: "site-count" }, [
-        L.el("span", { class: "site-figure", text: String(s.plume_count) }),
-        L.el("span", { class: "site-unit", text: s.plume_count === 1 ? " plume" : " plumes" })
-      ]),
-      L.el("span", { class: "site-sub site-last", text: "Last seen " + L.fmtDate(s.last_date) })
-    ]);
-    var hay = [s.name, s.official_name, s.county, s.operator, s.nearest_record && s.nearest_record.name].filter(Boolean).join(" ").toLowerCase();
-    listEl.appendChild(L.el("li", { "data-search": hay }, [btn]));
-  });
+  function countIn(s, r) { return r === "all" ? s.plume_count : (s.recent ? s.recent.plume_count : 0); }
+
+  function renderRail() {
+    Array.prototype.forEach.call(rangeEl.querySelectorAll(".range-btn"), function (btn) {
+      btn.setAttribute("aria-pressed", String(btn.getAttribute("data-range") === range));
+    });
+    var note = document.getElementById("rail-note");
+    if (range === "all") {
+      note.textContent = L.plural(D.waste_plumes, "waste-sector plume") + " seen from aircraft and satellites between " +
+        L.fmtDate(D.waste_oldest_observation || D.oldest_observation) + " and " + L.fmtDate(D.waste_newest_observation || D.newest_observation) +
+        ", grouped into sites where detections fall within " + D.cluster_km + " km of each other. Totals follow how often aircraft and satellites flew over, not only how often a site leaked.";
+    } else {
+      var n = D.sites.reduce(function (t, s) { return t + countIn(s, "recent"); }, 0);
+      var active = D.sites.filter(function (s) { return s.recent; }).length;
+      var k = { space: 0, aircraft: 0, unknown: 0 };
+      D.sites.forEach(function (s) { var c = L.kindCounts(L.view(s, "recent")); k.space += c.space; k.aircraft += c.aircraft; });
+      note.textContent = L.plural(n, "waste-sector plume") + " seen at " + active + " of " + D.sites.length +
+        " sites in " + L.windowLabel() + " (since " + L.fmtDate(D.recent_since) + "): " + k.space + " by satellite, " + k.aircraft +
+        " from aircraft. Sites are grouped where detections fall within " + D.cluster_km + " km of each other.";
+    }
+
+    var order = D.sites.slice().sort(function (a, b) {
+      return countIn(b, range) - countIn(a, range) || b.plume_count - a.plume_count;
+    });
+    listEl.textContent = "";
+    listEl.setAttribute("aria-label", range === "all" ? "Landfills, most detections first" : "Landfills, most detections in " + L.windowLabel() + " first");
+    order.forEach(function (s) {
+      var n = countIn(s, range);
+      var btn = L.el("a", { class: "site" + (n ? "" : " site--quiet"), href: L.hashFor(s.id, range), "data-site": s.id }, [
+        L.el("span", { class: "site-name", text: s.name }),
+        L.el("span", { class: "site-sub", text: s.county || (s.nearest_record ? "Unmatched; " + s.nearest_record.distance_km + " km from " + s.nearest_record.name : "No registered landfill within 10 km") }),
+        L.el("span", { class: "site-count" }, [
+          L.el("span", { class: "site-figure", text: String(n) }),
+          L.el("span", { class: "site-unit", text: n === 1 ? " plume" : " plumes" })
+        ]),
+        L.el("span", { class: "site-sub site-last", text: n || range === "all" ? "Last seen " + L.fmtDate(s.last_date) : "None since " + L.fmtDate(D.recent_since) + "; last seen " + L.fmtDate(s.last_date) })
+      ]);
+      var hay = [s.name, s.official_name, s.county, s.operator, s.nearest_record && s.nearest_record.name].filter(Boolean).join(" ").toLowerCase();
+      listEl.appendChild(L.el("li", { "data-search": hay }, [btn]));
+    });
+    if (applyFilter) applyFilter();
+    restyleMarkers();
+    if (currentSite) markCurrent(currentSite.id);
+  }
 
   // Filter the list as you type. The map keeps every site; the list is the control.
   (function initFilter() {
@@ -61,10 +104,10 @@
       });
       if (shown) listEl.removeAttribute("data-empty"); else listEl.setAttribute("data-empty", "");
       count.textContent = q ? (shown ? "Showing " + shown + " of " + D.sites.length + " sites" : "No site matches “" + input.value.trim() + "”")
-        : D.sites.length + " sites, most detections first";
+        : D.sites.length + " sites, most detections " + (range === "all" ? "first" : "in " + L.windowLabel() + " first");
     }
     input.addEventListener("input", apply);
-    apply();
+    applyFilter = apply;
   })();
 
   function initMap() {
@@ -76,16 +119,38 @@
     }).addTo(map);
     var bounds = [];
     D.sites.forEach(function (s) {
-      var r = Math.min(22, 4 + Math.sqrt(s.plume_count) * 1.3);
-      var mk = window.L.circleMarker([s.lat, s.lon], { radius: r, className: "site-marker", weight: 2 });
-      mk.bindTooltip(s.name + ": " + L.plural(s.plume_count, "plume"));
-      mk.on("click", function () { window.location.hash = "site=" + s.id; });
+      var mk = window.L.circleMarker([s.lat, s.lon], { radius: 6, className: "site-marker", weight: 2 });
+      mk.on("click", function () { window.location.hash = L.hashFor(s.id, range).slice(1); });
       mk.addTo(map);
       markers[s.id] = mk;
       bounds.push([s.lat, s.lon]);
     });
     map.fitBounds(bounds, { padding: [24, 24] });
     initMapToggle(bounds);
+  }
+
+  // Marker size follows the detections in the chosen range; sites with none in it are drawn hollow.
+  function restyleMarkers() {
+    D.sites.forEach(function (s) {
+      var mk = markers[s.id];
+      if (!mk) return;
+      var n = countIn(s, range);
+      mk.setRadius(n ? Math.min(22, 4 + Math.sqrt(n) * 1.3) : 4);
+      mk.unbindTooltip();
+      mk.bindTooltip(s.name + ": " + L.plural(n, "plume") + (range === "all" ? "" : " in " + L.windowLabel()));
+      var path = mk.getElement && mk.getElement();
+      if (path) path.classList.toggle("is-quiet", !n);
+    });
+  }
+  function markCurrent(id) {
+    Array.prototype.forEach.call(listEl.querySelectorAll(".site"), function (a) {
+      if (a.getAttribute("data-site") === id) a.setAttribute("aria-current", "true");
+      else a.removeAttribute("aria-current");
+    });
+    Object.keys(markers).forEach(function (mid) {
+      var path = markers[mid].getElement && markers[mid].getElement();
+      if (path) path.classList.toggle("is-current", mid === id);
+    });
   }
 
   // Expand the map to fill the window. The rest of the page is made inert while it is open,
@@ -155,7 +220,29 @@
     ]);
   }
 
-  function renderSite(site) {
+  function rangeNote(v) {
+    var full = v.full, other = L.hashFor(full.id, v.range === "all" ? "recent" : "all");
+    if (v.range === "all") {
+      return L.el("p", { class: "range-note" }, [
+        "Showing the full record: " + L.plural(full.plume_count, "detection") + " since " + L.fmtDate(full.first_date) + ". ",
+        D.recent_since ? L.el("a", { href: other, text: "Show " + L.windowLabel() + " only" }) : null
+      ]);
+    }
+    var earlier = full.plume_count - v.plume_count;
+    return L.el("p", { class: "range-note" }, [
+      "Showing " + L.windowLabel() + ", since " + L.fmtDate(D.recent_since) + ": " + L.plural(v.plume_count, "detection") + " of " + full.plume_count + ". " +
+        (earlier ? L.plural(earlier, "earlier detection") + " since " + L.fmtDate(full.first_date) + " " + (earlier === 1 ? "is" : "are") + " in the full history. " : ""),
+      earlier ? L.el("a", { href: other, text: "Show the full history" }) : null
+    ]);
+  }
+
+  function chartOpts() {
+    return range === "all" ? {} : { from: D.recent_since, to: D.fetched_at.slice(0, 10) };
+  }
+
+  function renderSite(full) {
+    var site = L.view(full, range);
+    currentSite = full;
     var kinds = L.kindCounts(site);
     var withheld = site.plume_count - site.quantified_count;
     detailEl.textContent = "";
@@ -170,7 +257,7 @@
     var head = L.el("header", { class: "detail-head" }, [
       L.el("div", { class: "detail-title" }, [L.el("h1", { text: site.name }), meta]),
       L.el("div", { class: "actions" }, [
-        L.el("a", { class: "btn btn--primary", href: "brief.html#site=" + site.id, text: "Generate one-page brief" }),
+        L.el("a", { class: "btn btn--primary", href: "brief.html" + L.hashFor(site.id, range), text: "Generate one-page brief" }),
         L.el("a", { class: "btn", href: L.LINKS.calsmp, rel: "noopener", target: "_blank" }, [
           "Check CARB notices", L.el("span", { class: "visually-hidden", text: " on the CalSMP dashboard (opens in a new tab)" })
         ])
@@ -203,33 +290,46 @@
         " classed by Carbon Mapper as a non-waste source and " + (site.nearby_other_sector === 1 ? "is" : "are") + " not counted here." }));
     }
 
-    // stats
-    detailEl.appendChild(L.el("dl", { class: "stats" }, [
-      stat("Plumes detected", String(site.plume_count), null, site.first_date === site.last_date ? "on " + L.fmtDate(site.first_date) : L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
-      stat("Median rate", site.median_rate_kg_h == null ? "n/a" : L.fmtRate(site.median_rate_kg_h), site.median_rate_kg_h == null ? null : "kg/h",
-        "of " + L.plural(site.quantified_count, "plume") + " with a published rate"),
-      stat("Largest rate", site.max_rate_kg_h == null ? "n/a" : L.fmtRate(site.max_rate_kg_h), site.max_rate_kg_h == null ? null : "kg/h",
-        site.max_rate_kg_h == null ? null : "± " + L.fmtRate(site.max_rate_uncertainty_kg_h) + " kg/h, " + L.fmtDate(site.max_rate_date)),
-      stat("Seen from aircraft", String(kinds.aircraft), null, "and " + kinds.space + " from satellites")
-    ]));
+    // range, stats, timeline
+    detailEl.appendChild(rangeNote(site));
+    if (!site.plume_count) {
+      detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
+        L.el("h2", { id: "timeline-title", text: "No detections in " + L.windowLabel() }),
+        L.el("p", { class: "lede", text: "Carbon Mapper published no plume at this site between " + L.fmtDate(D.recent_since) + " and " + L.fmtDate(D.fetched_at) +
+          ". That does not mean nothing leaked: the site may not have been flown over, or passed by a satellite with clear skies. The last detection was on " + L.fmtDate(full.last_date) + "." }),
+        L.el("p", {}, [L.el("a", { class: "btn", href: L.hashFor(full.id, "all"), text: "Show the full history (" + L.plural(full.plume_count, "detection") + ")" })])
+      ]));
+    } else {
+      detailEl.appendChild(L.el("dl", { class: "stats" }, [
+        stat(range === "all" ? "Plumes detected" : "Plumes detected, last " + D.recent_months + " months", String(site.plume_count), null,
+          site.first_date === site.last_date ? "on " + L.fmtDate(site.first_date) : L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
+        stat("Median rate", site.median_rate_kg_h == null ? "n/a" : L.fmtRate(site.median_rate_kg_h), site.median_rate_kg_h == null ? null : "kg/h",
+          "of " + L.plural(site.quantified_count, "plume") + " with a published rate"),
+        stat("Largest rate", site.max_rate_kg_h == null ? "n/a" : L.fmtRate(site.max_rate_kg_h), site.max_rate_kg_h == null ? null : "kg/h",
+          site.max_rate_kg_h == null ? null : "± " + L.fmtRate(site.max_rate_uncertainty_kg_h) + " kg/h, " + L.fmtDate(site.max_rate_date)),
+        stat("Seen from aircraft", String(kinds.aircraft), null, "and " + kinds.space + " from satellites")
+      ]));
 
-    // timeline
-    var chartBox = L.el("div", { class: "chart-box" });
-    var legend = L.el("ul", { class: "legend", "aria-label": "Chart key" }, [
-      L.el("li", {}, [L.el("span", { class: "key key--dot", "aria-hidden": "true" }), "One detection at its estimated rate"]),
-      L.el("li", {}, [L.el("span", { class: "key key--whisker", "aria-hidden": "true" }), "Published uncertainty (±)"]),
-      withheld ? L.el("li", {}, [L.el("span", { class: "key key--square", "aria-hidden": "true" }), "Detected, rate not published (" + withheld + ")"]) : null
-    ]);
-    detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
-      L.el("h2", { id: "timeline-title", text: site.first_date.slice(0, 4) === site.last_date.slice(0, 4) ? "Every detection, " + site.first_date.slice(0, 4) : "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4) }),
-      L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site; dots from the same day are spread a few pixels apart. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
-      legend, chartBox,
-      L.el("details", { class: "more" }, [
-        L.el("summary", { text: "All " + L.plural(site.plume_count, "detection") + " as a table" }),
-        plumeTable(site)
-      ])
-    ]));
-    window.LMBChart.render(chartBox, site);
+      var chartBox = L.el("div", { class: "chart-box" });
+      var legend = L.el("ul", { class: "legend", "aria-label": "Chart key" }, [
+        L.el("li", {}, [L.el("span", { class: "key key--dot", "aria-hidden": "true" }), "One detection at its estimated rate"]),
+        L.el("li", {}, [L.el("span", { class: "key key--whisker", "aria-hidden": "true" }), "Published uncertainty (±)"]),
+        withheld ? L.el("li", {}, [L.el("span", { class: "key key--square", "aria-hidden": "true" }), "Detected, rate not published (" + withheld + ")"]) : null
+      ]);
+      var heading = range !== "all" ? "Detections in " + L.windowLabel()
+        : site.first_date.slice(0, 4) === site.last_date.slice(0, 4) ? "Every detection, " + site.first_date.slice(0, 4)
+        : "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4);
+      detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
+        L.el("h2", { id: "timeline-title", text: heading }),
+        L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site; dots from the same day are spread a few pixels apart. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
+        legend, chartBox,
+        L.el("details", { class: "more" }, [
+          L.el("summary", { text: (range === "all" ? "All " : "These ") + L.plural(site.plume_count, "detection") + " as a table" }),
+          plumeTable(site)
+        ])
+      ]));
+      window.LMBChart.render(chartBox, site, chartOpts());
+    }
 
     // checklist
     var dutiesBox = L.el("div", { class: "checklist" });
@@ -241,26 +341,24 @@
     window.LMBChecklist.render(dutiesBox);
 
     // selection state
-    Array.prototype.forEach.call(listEl.querySelectorAll(".site"), function (a) {
-      if (a.getAttribute("data-site") === site.id) a.setAttribute("aria-current", "true");
-      else a.removeAttribute("aria-current");
-    });
-    Object.keys(markers).forEach(function (id) {
-      var path = markers[id].getElement && markers[id].getElement();
-      if (path) path.classList.toggle("is-current", id === site.id);
-    });
+    markCurrent(site.id);
     document.title = site.name + ": methane plume history and the 2027 rule";
   }
 
   function route(focus) {
     var asked = L.siteIdFromHash();
+    var newRange = D.recent_since ? L.rangeFromHash() : "all";
+    var rangeChanged = newRange !== range;
+    range = newRange;
+    if (rangeChanged || !listEl.querySelector(".site")) renderRail();
     var site = L.siteById(asked) || D.sites[0];
     renderSite(site);
     if (asked && asked !== site.id) {
-      history.replaceState(null, "", "#site=" + site.id);
+      history.replaceState(null, "", L.hashFor(site.id, range));
       detailEl.insertBefore(L.el("p", { class: "note", text: "No landfill matches “" + asked + "”, so the site with the most detections is shown." }), detailEl.children[1]);
     }
     if (statusEl) { detailEl.prepend(statusEl); statusEl.textContent = "Showing " + site.name; }
+    if (keepFocus) { keepFocus = false; focus = false; }
     if (focus) {
       var h1 = detailEl.querySelector("h1");
       h1.setAttribute("tabindex", "-1");
@@ -292,7 +390,7 @@
       if (Math.abs(window.innerWidth - lastW) < 40) return;
       lastW = window.innerWidth;
       var box = detailEl.querySelector(".chart-box"), site = L.siteById(L.siteIdFromHash()) || D.sites[0];
-      if (box) window.LMBChart.render(box, site);
+      if (box) window.LMBChart.render(box, L.view(site, range), chartOpts());
     }, 200);
   });
 })();

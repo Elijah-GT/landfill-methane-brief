@@ -64,8 +64,11 @@
     var H = opts.height || (W < 520 ? 240 : 280);
     var m = { l: 64, r: 16, t: 32, b: H < 200 ? 52 : 64 };
     var pw = W - m.l - m.r, ph = H - m.t - m.b;
-    var firstYear = +site.first_date.slice(0, 4), lastYear = +site.last_date.slice(0, 4);
-    var x0 = Date.UTC(firstYear, 0, 1), x1 = Date.UTC(lastYear + 1, 0, 1);
+    // x range: whole years from first to last detection, or an explicit window (opts.from/opts.to, ISO dates).
+    var x0, x1;
+    if (opts.from && opts.to) { x0 = t(opts.from); x1 = t(opts.to); }
+    else { x0 = Date.UTC(+site.first_date.slice(0, 4), 0, 1); x1 = Date.UTC(+site.last_date.slice(0, 4) + 1, 0, 1); }
+    var firstYear = new Date(x0).getUTCFullYear(), lastYear = new Date(x1 - 1).getUTCFullYear();
     var rated = site.plumes.filter(function (p) { return p.rate_kg_h != null; });
     var scale = niceScale(Math.max.apply(null, [0].concat(rated.map(function (p) {
       return p.rate_kg_h + (p.uncertainty_kg_h || 0);
@@ -99,12 +102,19 @@
     svg.appendChild(unit);
 
     // year ticks
+    // Year boundaries get a tick; each year's label sits in the middle of its visible part,
+    // and is skipped when that part is too narrow to hold it.
     var span = lastYear - firstYear + 1, every = span > (W < 520 ? 4 : 8) ? 2 : 1;
     for (var yr = firstYear; yr <= lastYear + 1; yr++) {
-      var xx = X(Date.UTC(yr, 0, 1));
-      svg.appendChild(svgEl("line", { x1: xx, x2: xx, y1: m.t + ph, y2: m.t + ph + 6, class: "chart-axis" }));
+      var jan = Date.UTC(yr, 0, 1);
+      if (jan >= x0 && jan <= x1) {
+        var xx = X(jan);
+        svg.appendChild(svgEl("line", { x1: xx, x2: xx, y1: m.t + ph, y2: m.t + ph + 6, class: "chart-axis" }));
+      }
       if (yr <= lastYear && (yr - firstYear) % every === 0) {
-        var yl = svgEl("text", { x: X(Date.UTC(yr, 6, 1)), y: m.t + ph + 20, class: "chart-label", "text-anchor": "middle" });
+        var a = Math.max(x0, jan), b = Math.min(x1, Date.UTC(yr + 1, 0, 1));
+        if (X(b) - X(a) < 36) continue;
+        var yl = svgEl("text", { x: (X(a) + X(b)) / 2, y: m.t + ph + 20, class: "chart-label", "text-anchor": "middle" });
         yl.textContent = String(yr);
         svg.appendChild(yl);
       }

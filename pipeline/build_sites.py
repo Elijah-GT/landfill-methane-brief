@@ -36,6 +36,7 @@ WASTE_SECTOR = "6A"
 CLUSTER_KM = 1.0
 NAME_RADIUS_KM = 3.0
 EDGE_WARN_KM = 3.0
+RECENT_MONTHS = 24  # the app's default window: detections in the 24 months before the data was fetched
 NEAREST_RECORD_KM = 10.0  # for unnamed sites, show the nearest landfill record within this distance
 
 
@@ -56,6 +57,29 @@ def publication_lag_days(plumes: list[dict], since: str = "2025-01-01") -> dict:
     if not lags:
         return {"since": since, "n": 0, "min": None, "median": None}
     return {"since": since, "n": len(lags), "min": round(min(lags), 1), "median": round(median(lags), 1)}
+
+
+def recent_since(fetched_at: str, months: int = RECENT_MONTHS) -> str:
+    """First day of the recent window: the fetch date moved back `months` months (Feb 29 -> Feb 28)."""
+    d = _parse(fetched_at).date()
+    y, m = divmod(d.month - 1 - months, 12)
+    year, month = d.year + y, m + 1
+    for day in (d.day, 30, 29, 28):
+        try:
+            return d.replace(year=year, month=month, day=day).isoformat()
+        except ValueError:
+            continue
+    raise ValueError(fetched_at)
+
+
+def window_stats(plumes: list[dict], since: str) -> dict | None:
+    """Per-site statistics for detections on or after `since`, or None when there are none."""
+    recent = [p for p in plumes if p["scene_timestamp"][:10] >= since]
+    if not recent:
+        return None
+    stats = site_stats(recent)
+    del stats["lat"], stats["lon"]  # the site's location stays the full-record centre
+    return stats
 
 
 def km_to_bbox_edge(lat: float, lon: float, bbox: list[float] | None) -> float | None:
@@ -120,6 +144,7 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
     groups.sort(key=lambda g: -len(g["members"]))
 
     # Pass 2: one site per group, ranked by detections.
+    since = recent_since(snapshot["fetched_at"])
     sites = []
     used_ids: set[str] = set()
     for rank, g in enumerate(groups, start=1):
@@ -167,6 +192,7 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
             "outlying_groups": len(g["parts"]) - 1,
             "outlying_detections": outlying,
             **stats,
+            "recent": window_stats(members, since),
             "max_km_from_center": max(r["km_from_center"] for r in rows),
             "nearby_other_sector": nearby_other,
             "km_to_bbox_edge": round(edge_km, 1) if edge_km is not None else None,
@@ -184,6 +210,8 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
         "source_url": snapshot.get("source_url"),
         "bbox": snapshot.get("bbox"),
         "cluster_km": CLUSTER_KM,
+        "recent_months": RECENT_MONTHS,
+        "recent_since": since,
         "total_plumes": len(all_plumes),
         "waste_plumes": len(waste_ca),
         "outside_california": outside,

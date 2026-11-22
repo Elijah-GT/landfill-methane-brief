@@ -129,3 +129,37 @@ def test_outlying_groups_matching_one_landfill_are_folded_in():
     assert big["plume_count"] == 3 and big["id"] == "big-landfill"
     assert big["outlying_groups"] == 1 and big["outlying_detections"] == 1
     assert len(sites) == 2 and sites[1]["official_name"] is None and sites[1]["outlying_groups"] == 0
+
+
+def test_recent_window_since_date():
+    from pipeline.build_sites import recent_since
+    assert recent_since("2026-11-22T16:38:42+00:00") == "2024-11-22"
+    assert recent_since("2026-02-28T00:00:00Z", 24) == "2024-02-28"
+    assert recent_since("2028-02-29T00:00:00Z", 12) == "2027-02-28"
+    assert recent_since("2026-01-15T00:00:00Z", 1) == "2025-12-15"
+
+
+def test_recent_window_stats_per_site():
+    from pipeline.build_sites import build
+    def plume(pid, day, rate):
+        return {"plume_id": pid, "scene_timestamp": day + "T18:00:00Z", "published_at": day + "T18:00:00Z",
+                "sector": "6A", "lat": 38.0, "lon": -121.0, "emission_auto": rate, "emission_uncertainty_auto": 10.0,
+                "platform": "GAO", "hide_emission": False}
+    snap = {"fetched_at": "2026-11-22T00:00:00Z", "plumes": [
+        plume("old", "2017-06-01", 900.0), plume("edge", "2024-11-22", 100.0), plume("new", "2026-01-01", 300.0)]}
+    data = build(snap, [])
+    assert data["recent_since"] == "2024-11-22" and data["recent_months"] == 24
+    site = data["sites"][0]
+    assert site["plume_count"] == 3 and site["max_rate_kg_h"] == 900.0
+    r = site["recent"]
+    assert r["plume_count"] == 2 and r["first_date"] == "2024-11-22" and r["max_rate_kg_h"] == 300.0
+    assert "lat" not in r
+
+
+def test_recent_window_empty_is_none():
+    from pipeline.build_sites import build
+    snap = {"fetched_at": "2026-11-22T00:00:00Z", "plumes": [
+        {"plume_id": "x", "scene_timestamp": "2017-06-01T00:00:00Z", "published_at": "2017-07-01T00:00:00Z",
+         "sector": "6A", "lat": 38.0, "lon": -121.0, "emission_auto": 50.0, "emission_uncertainty_auto": 5.0,
+         "platform": "AVIRIS-NG", "hide_emission": False}]}
+    assert build(snap, [])["sites"][0]["recent"] is None
