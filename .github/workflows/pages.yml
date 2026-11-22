@@ -47,5 +47,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
+      - name: Give the uploaded artifact time to appear (deploy-pages sometimes looks too soon)
+        run: sleep 20
       - id: deployment
         uses: actions/deploy-pages@v4
