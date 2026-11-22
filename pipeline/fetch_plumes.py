@@ -3,8 +3,8 @@ for a bounding box and save a trimmed snapshot to data/plumes_snapshot.json.
 
 Standard library only, so it runs from a clean clone with no installs.
 
-    python pipeline/fetch_plumes.py            # default Sacramento-region box
-    python pipeline/fetch_plumes.py --bbox -122.2 38.0 -120.9 39.2
+    python pipeline/fetch_plumes.py            # default: all of California
+    python pipeline/fetch_plumes.py --bbox -122.2 37.9 -120.8 39.2   # Sacramento region only
 
 If Carbon Mapper starts requiring a token, set CARBONMAPPER_TOKEN in your
 environment; it is sent as a Bearer token and never written to disk.
@@ -23,9 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 API_URL = "https://api.carbonmapper.org/api/v1/catalog/plumes/annotated"
-# min lon, min lat, max lon, max lat: Sacramento valley and delta, Pittsburg to Yuba City.
+# min lon, min lat, max lon, max lat: a box around California. It also takes in parts of Nevada,
+# Oregon, Arizona and Mexico; build_sites.py drops sites outside California's borders.
 # Keep every site well inside the box: a landfill on the edge loses detections (see NOTES.md).
-DEFAULT_BBOX = (-122.2, 37.9, -120.8, 39.2)
+DEFAULT_BBOX = (-124.5, 32.5, -114.1, 42.1)
 PAGE_SIZE = 500
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = ROOT / "data" / "plumes_snapshot.json"

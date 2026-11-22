@@ -4,6 +4,8 @@
 
 Reads  data/plumes_snapshot.json  (written by fetch_plumes.py)
        pipeline/site_names.json   (hand-checked landfill names, each with a source)
+       pipeline/ghgrp_ca_landfills.json (EPA GHGRP landfill records, from
+                                   fetch_landfill_names.py; used when no hand-checked name fits)
 Writes web/data/sites.js          (window.LMB_DATA = {...}; a .js file so the
                                    app also opens straight from disk, no server)
 
@@ -22,17 +24,19 @@ from statistics import median
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pipeline.sites import cluster_points, haversine_km, match_name, site_stats  # noqa: E402
+from pipeline.sites import cluster_points, haversine_km, in_california, match_name, site_stats  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT = ROOT / "data" / "plumes_snapshot.json"
 NAMES = ROOT / "pipeline" / "site_names.json"
+GHGRP_NAMES = ROOT / "pipeline" / "ghgrp_ca_landfills.json"
 OUT = ROOT / "web" / "data" / "sites.js"
 
 WASTE_SECTOR = "6A"
 CLUSTER_KM = 1.0
 NAME_RADIUS_KM = 3.0
 EDGE_WARN_KM = 3.0
+NEAREST_RECORD_KM = 10.0  # for unnamed sites, show the nearest landfill record within this distance
 
 
 def _parse(ts: str) -> datetime:
@@ -83,22 +87,40 @@ def plume_row(p: dict, lat: float, lon: float) -> dict:
     }
 
 
-def build(snapshot: dict, names: list[dict]) -> dict:
+def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None = None) -> dict:
     all_plumes = snapshot["plumes"]
     waste = [p for p in all_plumes if p.get("sector") == WASTE_SECTOR]
     other = [p for p in all_plumes if p.get("sector") != WASTE_SECTOR]
     bbox = snapshot.get("bbox")
     sites = []
     used_ids: set[str] = set()
-    for rank, idx in enumerate(cluster_points(waste, CLUSTER_KM), start=1):
+    outside: list[dict] = []
+    all_names = list(names) + list(fallback_names or [])
+    rank = 0
+    for idx in cluster_points(waste, CLUSTER_KM):
         members = sorted((waste[i] for i in idx), key=lambda p: p["scene_timestamp"])
         stats = site_stats(members)
-        named = match_name(stats["lat"], stats["lon"], names, NAME_RADIUS_KM)
+        if not in_california(stats["lat"], stats["lon"]):
+            outside.append({"lat": round(stats["lat"], 4), "lon": round(stats["lon"], 4), "plume_count": len(members)})
+            continue
+        rank += 1
+        named = (match_name(stats["lat"], stats["lon"], names, NAME_RADIUS_KM)
+                 or match_name(stats["lat"], stats["lon"], fallback_names or [], NAME_RADIUS_KM))
         label = named["short_name"] if named else f"Unnamed waste site near {stats['lat']:.3f}, {stats['lon']:.3f}"
-        site_id = slugify(named["short_name"]) if named else f"site-{rank}"
+        if not named and (stats["lat"] < 32.9 or (stats["lat"] < 35.0 and stats["lon"] > -114.9)):
+            print(f"note: unnamed site at {stats['lat']:.3f}, {stats['lon']:.3f} is near the Mexico or Arizona "
+                  "border; check by hand that it is in California", file=sys.stderr)
+        site_id = slugify(named["short_name"]) if named else slugify(f"site {stats['lat']:.3f} {stats['lon']:.3f}")
         while site_id in used_ids:
             site_id += "-b"
         used_ids.add(site_id)
+        nearest = None
+        if not named and all_names:
+            cand = min(all_names, key=lambda e: haversine_km(stats["lat"], stats["lon"], e["lat"], e["lon"]))
+            dist = haversine_km(stats["lat"], stats["lon"], cand["lat"], cand["lon"])
+            if dist <= NEAREST_RECORD_KM:
+                nearest = {"name": cand["short_name"], "distance_km": round(dist, 1),
+                           "county": cand.get("county"), "source_url": cand.get("source_url")}
         rows = [plume_row(p, stats["lat"], stats["lon"]) for p in members]
         # Plumes Carbon Mapper put in another sector but within 1 km of this site's detections:
         # not counted, but reported so the site's numbers are not read as complete.
@@ -121,6 +143,7 @@ def build(snapshot: dict, names: list[dict]) -> dict:
             "name_source_url": named.get("source_url") if named else None,
             "name_distance_km": round(haversine_km(stats["lat"], stats["lon"], named["lat"], named["lon"]), 2)
             if named else None,
+            "nearest_record": nearest,
             **stats,
             "max_km_from_center": max(r["km_from_center"] for r in rows),
             "nearby_other_sector": nearby_other,
@@ -129,7 +152,9 @@ def build(snapshot: dict, names: list[dict]) -> dict:
         })
 
     observed = sorted(p["scene_timestamp"] for p in all_plumes)
-    waste_observed = sorted(p["scene_timestamp"] for p in waste)
+    kept = {r["plume_id"] for s in sites for r in s["plumes"]}
+    waste_ca = [p for p in waste if p["plume_id"] in kept]
+    waste_observed = sorted(p["scene_timestamp"] for p in waste_ca)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "fetched_at": snapshot["fetched_at"],
@@ -138,7 +163,8 @@ def build(snapshot: dict, names: list[dict]) -> dict:
         "bbox": snapshot.get("bbox"),
         "cluster_km": CLUSTER_KM,
         "total_plumes": len(all_plumes),
-        "waste_plumes": len(waste),
+        "waste_plumes": len(waste_ca),
+        "outside_california": outside,
         "oldest_observation": observed[0][:10] if observed else None,
         "newest_observation": observed[-1][:10] if observed else None,
         "waste_oldest_observation": waste_observed[0][:10] if waste_observed else None,
@@ -152,12 +178,14 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Build web/data/sites.js from the plume snapshot.")
     ap.add_argument("--snapshot", type=Path, default=SNAPSHOT)
     ap.add_argument("--names", type=Path, default=NAMES)
+    ap.add_argument("--ghgrp-names", type=Path, default=GHGRP_NAMES)
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args(argv)
 
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     names = json.loads(args.names.read_text(encoding="utf-8")) if args.names.exists() else []
-    data = build(snapshot, names)
+    fallback = json.loads(args.ghgrp_names.read_text(encoding="utf-8")) if args.ghgrp_names.exists() else []
+    data = build(snapshot, names, fallback)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
         "// Generated by pipeline/build_sites.py. Do not edit by hand.\n"

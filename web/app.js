@@ -36,15 +36,35 @@
   D.sites.forEach(function (s) {
     var btn = L.el("a", { class: "site", href: "#site=" + s.id, "data-site": s.id }, [
       L.el("span", { class: "site-name", text: s.name }),
-      L.el("span", { class: "site-sub", text: (s.county || "County not matched") }),
+      L.el("span", { class: "site-sub", text: s.county || (s.nearest_record ? "Unmatched; " + s.nearest_record.distance_km + " km from " + s.nearest_record.name : "No registered landfill within 10 km") }),
       L.el("span", { class: "site-count" }, [
         L.el("span", { class: "site-figure", text: String(s.plume_count) }),
         L.el("span", { class: "site-unit", text: s.plume_count === 1 ? " plume" : " plumes" })
       ]),
       L.el("span", { class: "site-sub site-last", text: "Last seen " + L.fmtDate(s.last_date) })
     ]);
-    listEl.appendChild(L.el("li", {}, [btn]));
+    var hay = [s.name, s.official_name, s.county, s.operator, s.nearest_record && s.nearest_record.name].filter(Boolean).join(" ").toLowerCase();
+    listEl.appendChild(L.el("li", { "data-search": hay }, [btn]));
   });
+
+  // Filter the list as you type. The map keeps every site; the list is the control.
+  (function initFilter() {
+    var box = document.getElementById("filter"), input = document.getElementById("site-filter"), count = document.getElementById("filter-count");
+    if (D.sites.length < 12) return;
+    box.hidden = false;
+    function apply() {
+      var q = input.value.trim().toLowerCase(), shown = 0;
+      Array.prototype.forEach.call(listEl.children, function (li) {
+        var hit = !q || li.getAttribute("data-search").indexOf(q) >= 0;
+        li.hidden = !hit;
+        if (hit) shown++;
+      });
+      count.textContent = q ? (shown ? "Showing " + shown + " of " + D.sites.length + " sites" : "No site matches “" + input.value.trim() + "”")
+        : D.sites.length + " sites, most detections first";
+    }
+    input.addEventListener("input", apply);
+    apply();
+  })();
 
   function initMap() {
     var box = document.getElementById("map");
@@ -55,7 +75,7 @@
     }).addTo(map);
     var bounds = [];
     D.sites.forEach(function (s) {
-      var r = 5 + Math.sqrt(s.plume_count) * 2;
+      var r = Math.min(22, 4 + Math.sqrt(s.plume_count) * 1.3);
       var mk = window.L.circleMarker([s.lat, s.lon], { radius: r, className: "site-marker", weight: 2 });
       mk.bindTooltip(s.name + ": " + L.plural(s.plume_count, "plume"));
       mk.on("click", function () { window.location.hash = "site=" + s.id; });
@@ -163,7 +183,13 @@
         ")." + (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? " This is a closed landfill with a single detection; treat the match with care." : "")
       ]));
     } else {
-      detailEl.appendChild(L.el("p", { class: "note", text: "No registered landfill was matched within 3 km of these detections." }));
+      var nr = site.nearest_record;
+      detailEl.appendChild(L.el("p", { class: "note" }, nr ? [
+        "No registered landfill lies within 3 km of these detections, so the site is not named. The nearest EPA landfill record is " +
+          nr.name + ", " + nr.distance_km.toFixed(1) + " km from the site centre (",
+        L.el("a", { href: nr.source_url, rel: "noopener", target: "_blank" }, ["source record", L.el("span", { class: "visually-hidden", text: " (opens in a new tab)" })]),
+        "). EPA locations are sometimes an office address rather than the landfill itself."
+      ] : ["No registered landfill was matched within 10 km of these detections."]));
     }
     if (site.nearby_other_sector) {
       detailEl.appendChild(L.el("p", { class: "note", text: L.plural(site.nearby_other_sector, "other plume") +

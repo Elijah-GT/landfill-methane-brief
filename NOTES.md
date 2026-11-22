@@ -9,6 +9,17 @@ Status, decisions and what was or was not verified. All times PST, Sun Nov 22, 2
 * Brief: prints on exactly one US Letter page for all 9 sites (checked by printing each to PDF with headless Chrome and counting pages).
 * Deployed to GitHub Pages from `web/` by `.github/workflows/pages.yml`.
 
+## Statewide branch (`statewide`, started 08:37, after the 9:00 freeze was near)
+
+Not merged into `main`; the submitted site stays the Sacramento-region version until this is reviewed.
+
+* Snapshot: 5,493 CH4 plumes in the box −124.5 to −114.1 longitude, 32.5 to 42.1 latitude (fetched Nov 22, 2026, 08:38). Sectors: 2,726 in 6A, 1,583 in 1B2, 998 in 4B, 112 in 1A1, 74 other or blank.
+* One waste cluster (19 plumes at 36.38 N, 114.87 W) lies in Nevada and is dropped by the border test in `pipeline/sites.py`: the 120th meridian north of 39° N, then the straight line from 39° N 120° W to the Colorado River at about 35.0019 N, 114.6333 W. The Arizona and Mexico borders are not modelled; the build prints a note for any unnamed site near them. None appeared. That leaves 2,707 waste-sector plumes in 57 California sites.
+* Names: 124 California landfill records from EPA GHGRP (subparts HH and TT; reporting years 2011, 2014, 2017, 2020, 2023, each facility's latest kept). 45 of 57 sites match one within 3 km (9 from the hand-checked list). **The 36 new names were matched by distance only and not checked one by one.**
+* 12 sites have no record within 3 km. For several large ones the nearest EPA record is plainly the same landfill with an office or gate address (Altamont 4.7 km, Monterey Regional 3.2 km, Simi Valley 6.5 km, Johnson Canyon 3.1 km), but the app does not name them; it shows the nearest record and distance. A checked entry in `site_names.json` would name them.
+* All 57 briefs were printed to PDF with headless Chrome: each is exactly one US Letter page.
+* Unnamed sites now get IDs from their coordinates (`site-37-755-121-647`), so links survive a refresh.
+
 ## Verified (first-hour gate)
 
 | Check | Result | Source |

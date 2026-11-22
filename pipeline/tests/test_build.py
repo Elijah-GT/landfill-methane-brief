@@ -43,7 +43,7 @@ def test_named_site_first_and_unnamed_fallback():
     assert top["quantified_count"] == 2
     assert top["max_rate_kg_h"] == 300
     assert other["name"].startswith("Unnamed waste site near")
-    assert other["id"] == "site-2"
+    assert other["id"] == "site-38-900-121-900"  # from its coordinates, so links survive a data refresh
 
 
 def test_plume_rows_flag_withheld_rates_and_sorted_by_date():
@@ -88,3 +88,24 @@ def test_edge_site_warns(capsys):
     snap = dict(SNAP, bbox=[-121.3, 38.499, -121.1, 38.6])
     build(snap, NAMES)
     assert "fetch box edge" in capsys.readouterr().err
+
+
+def test_fallback_names_and_out_of_state_sites():
+    from pipeline.build_sites import build
+    def plume(pid, lat, lon):
+        return {"plume_id": pid, "scene_timestamp": "2024-01-01T00:00:00Z", "published_at": "2024-02-01T00:00:00Z",
+                "sector": "6A", "lat": lat, "lon": lon, "emission_auto": 100.0, "emission_uncertainty_auto": 30.0,
+                "platform": "GAO", "hide_emission": False}
+    snap = {"fetched_at": "2026-01-01T00:00:00Z", "plumes": [
+        plume("a", 38.0, -121.0), plume("b", 37.0, -120.0), plume("nv", 36.375, -114.865)]}
+    curated = [{"name": "A", "short_name": "Curated A", "lat": 38.001, "lon": -121.0}]
+    epa = [{"name": "A EPA", "short_name": "EPA A", "lat": 38.0, "lon": -121.0},
+           {"name": "B", "short_name": "EPA B", "lat": 37.05, "lon": -120.0, "source_url": "u"}]
+    data = build(snap, curated, epa)
+    names = [s["name"] for s in data["sites"]]
+    assert "Curated A" in names and "EPA A" not in names          # hand-checked names win
+    unnamed = [s for s in data["sites"] if s["official_name"] is None][0]
+    assert unnamed["nearest_record"]["name"] == "EPA B"            # 5.6 km away: shown, not used as the name
+    assert unnamed["id"] == "site-37-000-120-000"
+    assert data["outside_california"] == [{"lat": 36.375, "lon": -114.865, "plume_count": 1}]
+    assert data["waste_plumes"] == 2
