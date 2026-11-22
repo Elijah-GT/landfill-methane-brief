@@ -10,7 +10,7 @@ From January 1, 2027, California landfill operators must investigate and fix met
 
 ## What it does
 
-1. **Pick a landfill.** The app groups 2,707 waste-sector methane plumes seen in California (Sep 2016 to Oct 2026) into 57 sites, names 45 of them from EPA and CalRecycle records, and shows them on a searchable list and a map that expands to fill the window.
+1. **Pick a landfill.** The app groups 2,707 waste-sector methane plumes seen in California (Sep 2016 to Oct 2026) into 53 sites, names 41 of them from EPA and CalRecycle records, and shows them on a searchable list and a map that expands to fill the window.
 2. **See its history.** Count, date range, median and largest emission rate with its published uncertainty, and a timeline with one dot per detection and an uncertainty bar. Detections whose rate was not published are shown, not dropped.
 3. **See what the 2027 rule asks after a CARB notice.** Eleven operator duties, plus the notice that triggers them, each with its deadline, its section number linked to the page of the regulation, and the verbatim regulation text.
 4. **Generate a brief.** A print-ready, one-page US Letter brief with data dates, the 30-day publication lag, caveats and credits. Print it or save it as a PDF.
@@ -89,6 +89,7 @@ web/data/checklist.js (hand-built from the regulation) ─>  brief.html (one pri
 * **Only CARB's notification triggers the duties** (§ 95469(b)). A plume in the public data does not, by itself.
 * **About 30 days behind.** Carbon Mapper publishes plumes about 30 days after observation; the newest in this snapshot is from Sep 15, 2026. This is a history and accountability tool, not an alert system.
 * **Attribution is by distance.** A plume near a landfill may come from a neighbouring source. Each site shows how far its detections lie from its centre.
+* **Outlying detections are folded in.** Detections more than 1 km from a landfill's main group, but whose group matches the same landfill record within 3 km, are counted as part of that landfill (Sunshine Canyon, Prima Deshecha, Guadalupe). Each such site says how many there are and how far the furthest lies.
 * **12 sites are unnamed.** EPA's location for some large landfills is an office or gate address several kilometres from the tip face (for example 4.7 km at the site nearest Altamont Landfill), so no record falls within 3 km. These sites show the nearest record instead of guessing; adding a checked entry to `pipeline/site_names.json` names them.
 * **Names matched by distance were not checked one by one.** Only the 9 Sacramento-region names were checked by hand.
 * **Rates are estimates.** Each carries Carbon Mapper's published ± uncertainty. Carbon Mapper does not say whether that is one standard deviation or a 95% interval. 647 of the 2,707 waste-sector plumes have no published rate.

@@ -87,46 +87,45 @@ def plume_row(p: dict, lat: float, lon: float) -> dict:
     }
 
 
-def mark_secondary_matches(sites: list[dict]) -> None:
-    """When several sites match the same landfill record (outlying detections more than
-    1 km from the main group), the site with the most detections keeps the name (ties go to
-    the one nearer the record). The others are labelled "Near <name>" and point to it."""
-    groups: dict[str, list[dict]] = {}
-    for s in sites:
-        if s["official_name"]:
-            groups.setdefault(s["official_name"], []).append(s)
-    for group in groups.values():
-        if len(group) < 2:
-            continue
-        primary = max(group, key=lambda s: (s["plume_count"], -s["name_distance_km"]))
-        primary["id"] = slugify(primary["name"])
-        for s in group:
-            if s is primary:
-                continue
-            s["near_of"] = {"id": primary["id"], "name": primary["name"]}
-            s["name"] = "Near " + primary["name"]
-            s["id"] = slugify(f"near {primary['name']} {s['lat']:.3f} {s['lon']:.3f}")
-
-
 def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None = None) -> dict:
     all_plumes = snapshot["plumes"]
     waste = [p for p in all_plumes if p.get("sector") == WASTE_SECTOR]
     other = [p for p in all_plumes if p.get("sector") != WASTE_SECTOR]
     bbox = snapshot.get("bbox")
-    sites = []
-    used_ids: set[str] = set()
     outside: list[dict] = []
     all_names = list(names) + list(fallback_names or [])
-    rank = 0
+
+    # Pass 1: 1 km groups, each matched to a landfill record within 3 km. Groups that match
+    # the same record are one landfill: outlying detections more than 1 km from the main
+    # group are folded into it, and the site reports how many there were.
+    groups: list[dict] = []
+    by_record: dict[int, dict] = {}
     for idx in cluster_points(waste, CLUSTER_KM):
-        members = sorted((waste[i] for i in idx), key=lambda p: p["scene_timestamp"])
-        stats = site_stats(members)
-        if not in_california(stats["lat"], stats["lon"]):
-            outside.append({"lat": round(stats["lat"], 4), "lon": round(stats["lon"], 4), "plume_count": len(members)})
+        members = [waste[i] for i in idx]
+        c = site_stats(members)
+        if not in_california(c["lat"], c["lon"]):
+            outside.append({"lat": round(c["lat"], 4), "lon": round(c["lon"], 4), "plume_count": len(members)})
             continue
-        rank += 1
-        named = (match_name(stats["lat"], stats["lon"], names, NAME_RADIUS_KM)
-                 or match_name(stats["lat"], stats["lon"], fallback_names or [], NAME_RADIUS_KM))
+        named = (match_name(c["lat"], c["lon"], names, NAME_RADIUS_KM)
+                 or match_name(c["lat"], c["lon"], fallback_names or [], NAME_RADIUS_KM))
+        if named is not None and id(named) in by_record:
+            by_record[id(named)]["parts"].append(members)
+            continue
+        g = {"named": named, "parts": [members]}
+        groups.append(g)
+        if named is not None:
+            by_record[id(named)] = g
+    for g in groups:
+        g["members"] = sorted((p for part in g["parts"] for p in part), key=lambda p: p["scene_timestamp"])
+    groups.sort(key=lambda g: -len(g["members"]))
+
+    # Pass 2: one site per group, ranked by detections.
+    sites = []
+    used_ids: set[str] = set()
+    for rank, g in enumerate(groups, start=1):
+        members, named = g["members"], g["named"]
+        stats = site_stats(members)
+        outlying = len(members) - max(len(part) for part in g["parts"])
         label = named["short_name"] if named else f"Unnamed waste site near {stats['lat']:.3f}, {stats['lon']:.3f}"
         if not named and (stats["lat"] < 32.9 or (stats["lat"] < 35.0 and stats["lon"] > -114.9)):
             print(f"note: unnamed site at {stats['lat']:.3f}, {stats['lon']:.3f} is near the Mexico or Arizona "
@@ -165,7 +164,8 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
             "name_distance_km": round(haversine_km(stats["lat"], stats["lon"], named["lat"], named["lon"]), 2)
             if named else None,
             "nearest_record": nearest,
-            "near_of": None,
+            "outlying_groups": len(g["parts"]) - 1,
+            "outlying_detections": outlying,
             **stats,
             "max_km_from_center": max(r["km_from_center"] for r in rows),
             "nearby_other_sector": nearby_other,
@@ -173,7 +173,6 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
             "plumes": rows,
         })
 
-    mark_secondary_matches(sites)
     observed = sorted(p["scene_timestamp"] for p in all_plumes)
     kept = {r["plume_id"] for s in sites for r in s["plumes"]}
     waste_ca = [p for p in waste if p["plume_id"] in kept]

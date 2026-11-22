@@ -94,7 +94,7 @@
           : "Detections here lie up to " + Math.max(0.1, site.max_km_from_center).toFixed(1) + " km from the site centre. ") +
         (site.nearby_other_sector ? site.nearby_other_sector + " nearby plume" + (site.nearby_other_sector === 1 ? " was" : "s were") + " classed as non-waste and not counted. " : "") +
         (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? "The named facility is a closed landfill; treat the match with care. " : "") +
-        (site.near_of ? "These detections lie more than 1 km from the main group at " + site.near_of.name + " and are counted separately; they may come from that landfill or a neighbouring source. " : "") +
+        (site.outlying_groups ? site.outlying_detections + " detection" + (site.outlying_detections === 1 ? " lies" : "s lie") + " more than 1 km from the main group and " + (site.outlying_detections === 1 ? "is" : "are") + " counted as part of this landfill. " : "") +
         (!site.official_name && site.nearest_record ? "No registered landfill lies within 3 km; the nearest EPA record is " + site.nearest_record.name + ", " + site.nearest_record.distance_km.toFixed(1) + " km away. " : "") +
         "Rates are estimates with the uncertainty shown." })
     ])
