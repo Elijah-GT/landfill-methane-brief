@@ -174,7 +174,7 @@
       ? "The " + shownN + " most recent of " + newest.length + ". The full list, with Carbon Mapper plume IDs, is in the app."
       : "All " + newest.length + " detection" + (newest.length === 1 ? "" : "s") + (range === "recent" && !emptyWindow ? " in the window" : "") + ". Plume IDs are in the app.";
   }
-  sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-det-title" }, [
+  var detSection = el("section", { class: "b-block", "aria-labelledby": "b-det-title" }, [
     el("div", { class: "b-block-head" }, [el("h2", { id: "b-det-title", text: "Most recent detections" }), detNote]),
     detTable = el("table", { class: "b-table b-det-table" }, [
       el("thead", {}, [el("tr", {}, [
@@ -184,46 +184,91 @@
       ])]),
       detBody
     ])
-  ]));
+  ]);
+  sheet.appendChild(detSection);
   var detRows = notice ? 6 : 10;
   drawDetections(detRows);
 
-  // ---------- without a notice: what to do with this page ----------
-  if (!notice) {
-    var big = shown.max_rate_date ? L.fmtDate(shown.max_rate_date) : null;
-    sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-next-title" }, [
-      el("h2", { id: "b-next-title", text: "Next steps" }),
-      el("ol", { class: "b-next" }, [
-        el("li", { text: "Check CARB’s CalSMP dashboard for a plume notification to this landfill’s operator. Only CARB’s notice starts the operator’s duties under the 2027 rule (§ 95469(b), p. 26)." }),
-        el("li", { text: "If there is one, open this landfill in the app, enter the date the notice arrived, and print the follow-up version: due dates, the rule for each step, and what to ask." }),
-        el("li", { text: "In the meantime, ask the operator what was happening on site on these dates" + (big ? ", including the largest detection, on " + big : "") + ", and whether their own monitoring found anything near those locations." })
-      ])
-    ]));
+  // ---------- where detections repeat ----------
+  // Greedy grouping of the period's detections: take the detection with the most others within
+  // SPOT_KM, call that a spot, remove its members, repeat. A spot is listed only when it has
+  // detections on at least two different days, so one flyover with several plumes is not
+  // read as recurrence. Plume locations are Carbon Mapper's estimated origins.
+  var SPOT_KM = 0.2;
+  function km(a, b) {
+    var r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * 6371 * Math.asin(Math.sqrt(h));
   }
-
-  // ---------- notes ----------
-  var lag = D.publication_lag_days;
-  var attribution = (site.plume_count === 1 ? "A single detection is a weak basis for attribution. "
-      : "Detections here lie up to " + Math.max(0.1, site.max_km_from_center).toFixed(1) + " km from the site centre. ") +
-    (site.outlying_groups ? site.outlying_detections + " lie more than 1 km from the main group and are counted here. " : "") +
-    (site.nearby_other_sector ? site.nearby_other_sector + " nearby plume" + (site.nearby_other_sector === 1 ? " was" : "s were") + " classed as non-waste and not counted. " : "") +
-    (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? "The named facility is a closed landfill. " : "") +
-    (!site.official_name && site.nearest_record ? "No registered landfill lies within 3 km; the nearest EPA record is " + site.nearest_record.name + ", " + site.nearest_record.distance_km.toFixed(1) + " km away. " : "");
-  function note(label, text) { return el("div", {}, [el("dt", { text: label }), el("dd", { text: text })]); }
-  sheet.appendChild(el("section", { class: "b-block b-notes", "aria-labelledby": "b-notes-title" }, [
-    el("h2", { id: "b-notes-title", text: "Notes on the data" }),
-    el("dl", {}, [
-      note("Not a finding", "Informational only. Not legal advice or a CARB determination, and it does not assess whether the operator is meeting the rule."),
-      note("Not an alert", "Plumes are published about 30 days after observation (median " + lag.median + " days here). Check CalSMP for current status."),
-      note("Attribution", "A plume near a landfill may come from a neighbouring source. " + attribution.trim()),
-      note("Coverage", "Detections follow when aircraft and satellites flew over; satellites see only larger leaks. Rates are estimates with the uncertainty shown.")
+  function findSpots(list) {
+    var left = list.slice(), out = [];
+    while (left.length) {
+      var best = null, members = [];
+      left.forEach(function (p) {
+        var m = left.filter(function (q) { return km(p, q) <= SPOT_KM; });
+        if (m.length > members.length) { members = m; best = p; }
+      });
+      if (members.length < 2) break;
+      left = left.filter(function (q) { return members.indexOf(q) < 0; });
+      var days = {};
+      members.forEach(function (q) { days[q.date] = true; });
+      var dates = members.map(function (q) { return q.date; }).sort();
+      var rated = members.filter(function (q) { return q.rate_kg_h != null; });
+      var top = rated.sort(function (a, b) { return b.rate_kg_h - a.rate_kg_h; })[0] || null;
+      if (Object.keys(days).length >= 2) out.push({ center: best, n: members.length, days: Object.keys(days).length, first: dates[0], last: dates[dates.length - 1], top: top });
+    }
+    return out;
+  }
+  var spots = findSpots(shown.plumes);
+  var spotBody = el("tbody");
+  var spotNote = el("p", { class: "b-key" });
+  var spotTable;
+  function drawSpots(n) {
+    spotBody.textContent = "";
+    spots.slice(0, n).forEach(function (sp, i) {
+      spotBody.appendChild(el("tr", {}, [
+        el("td", { class: "b-spot-n", text: String(i + 1) }),
+        el("td", { class: "num b-nowrap", text: sp.center.lat.toFixed(4) + ", " + sp.center.lon.toFixed(4) }),
+        el("td", { class: "b-nowrap" }, [el("strong", { text: sp.n + " detections" }), el("br"), sp.days + " different days"]),
+        el("td", { class: "b-nowrap", text: L.fmtDate(sp.first) + " to " + L.fmtDate(sp.last) }),
+        el("td", { class: "num b-nowrap", text: sp.top ? L.fmtRate(sp.top.rate_kg_h) + " ± " + L.fmtRate(sp.top.uncertainty_kg_h) : "not published" }),
+        el("td", { text: "What is at this spot, and has it been checked or repaired since " + L.fmtDate(sp.last) + "?" })
+      ]));
+    });
+    var share = spots.length ? Math.round(100 * spots[0].n / Math.max(1, shown.plume_count)) : 0;
+    spotNote.textContent = spots.length
+      ? (spots[0].n + " of " + shown.plume_count + " detections (" + share + "%) fall within " + Math.round(SPOT_KM * 1000) + " m of one spot.")
+      : "No spot had detections on more than one day in this period.";
+    if (spotTable) spotTable.hidden = !spots.length;
+  }
+  // the repeat spots are the headline finding, so they sit above the full detection list
+  sheet.insertBefore(el("section", { class: "b-block", "aria-labelledby": "b-spot-title" }, [
+    el("div", { class: "b-block-head" }, [el("h2", { id: "b-spot-title", text: "Where detections repeat" }), spotNote]),
+    spotTable = el("table", { class: "b-table b-spot-table" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { scope: "col", text: "" }), el("th", { scope: "col", class: "num", text: "Spot (within " + Math.round(SPOT_KM * 1000) + " m)" }),
+        el("th", { scope: "col", text: "Seen" }), el("th", { scope: "col", text: "First to last" }),
+        el("th", { scope: "col", class: "num", text: "Largest, kg/h" }), el("th", { scope: "col", text: "Ask the operator" })
+      ])]),
+      spotBody
     ])
-  ]));
-  var nameSource = !site.name_source_url ? "not matched to a registered facility."
+  ]), detSection);
+  var spotRows = notice ? 2 : 3;
+  drawSpots(spotRows);
+
+  // ---------- sources, and the limits of the data in one line ----------
+  var attribution = site.plume_count === 1 ? "a single detection is a weak basis for attribution"
+    : "detections lie up to " + Math.max(0.1, site.max_km_from_center).toFixed(1) + " km from the site centre" +
+      (site.nearby_other_sector ? " and " + site.nearby_other_sector + " nearby non-waste plume" + (site.nearby_other_sector === 1 ? " is" : "s are") + " not counted" : "");
+  var lag = D.publication_lag_days;
+  var nameSource = !site.name_source_url ? "not matched to a registered facility (nearest record named in the app)."
     : site.name_source_url.indexOf("calrecycle") >= 0 ? "CalRecycle SWIS." : "U.S. EPA Greenhouse Gas Reporting Program.";
   sheet.appendChild(el("footer", { class: "b-foot" }, [
-    el("p", { text: "Plume data: Source: Carbon Mapper (data.carbonmapper.org), non-commercial use under its Terms of Use. Regulation: CARB Landfill Methane Regulation, 17 CCR 95460 et seq. (unofficial clean copy effective Jan 1, 2027; the official CCR text governs). Facility name: " + nameSource }),
-    el("p", { text: "CalSMP dashboard: " + L.LINKS.calsmp })
+    el("p", { class: "b-limits" }, [el("strong", { text: "About this data. " }),
+      "Informational, not a compliance determination; only CARB’s notice starts the operator’s duties (§ 95469(b)). Plumes are published about " + lag.median +
+      " days after observation. A plume may come from a neighbouring source; " + attribution + ". Rates are estimates (±), and detections follow when aircraft and satellites flew over."]),
+    el("p", { text: "Sources: Carbon Mapper (data.carbonmapper.org), non-commercial use under its Terms of Use. CARB Landfill Methane Regulation, 17 CCR 95460 et seq. (unofficial clean copy effective Jan 1, 2027; the official CCR text governs). Facility name: " + nameSource +
+      " Notification status: CARB CalSMP dashboard, " + L.LINKS.calsmp })
   ]));
 
   // Keep the brief on one US Letter page: if the content is taller than the page, show fewer
@@ -249,6 +294,8 @@
     sheet.classList.remove("is-tight");
     sheet.classList.remove("is-tighter");
     var maxRows = notice ? 6 : 10;
+    spotRows = notice ? 2 : 3;
+    drawSpots(spotRows);
     detRows = maxRows;
     drawDetections(detRows);
     chartH = 150;
@@ -262,6 +309,7 @@
     while (over() && chartH > 130) { chartH -= 10; drawChart(chartH); }
     while (over() && detRows > 3) { detRows -= 1; drawDetections(detRows); }
     if (over()) sheet.classList.add("is-tighter");
+    while (over() && spotRows > 1) { spotRows -= 1; drawSpots(spotRows); }
     if (over()) { detRows = 0; drawDetections(0); }
     while (over() && chartH > 110) { chartH -= 10; drawChart(chartH); }   // very last: a short chart (2 y labels)
     // Then give back what still fits: chart height first, then rows.

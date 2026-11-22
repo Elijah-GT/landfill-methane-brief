@@ -87,11 +87,9 @@ body { font-variant-numeric: tabular-nums; background: var(--color-paper-2); }
 .b-det-table th:nth-child(3) { padding-left: 12pt; }
 
 /* next steps and notes */
-.b-next { margin: 0; padding-left: 13pt; display: grid; gap: 2pt; font-size: var(--pt-md); line-height: 1.3; }
-.b-notes dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2pt 10pt; font-size: var(--pt-sm); line-height: 1.3; }
-.b-notes dl > div { display: contents; }
-.b-notes dt { font-weight: 800; }
-.b-notes dd { margin: 0; color: var(--color-ink-2); }
+.b-spot-table .b-spot-n { font-weight: 800; width: 2%; }
+.b-spot-table td:last-child { color: var(--color-ink-2); }
+.b-limits { color: var(--color-ink); }
 
 .b-due-table td { padding-top: 3pt; padding-bottom: 3pt; }
 .b-due-table .b-due { font-weight: 800; white-space: nowrap; }
@@ -109,7 +107,7 @@ body { font-variant-numeric: tabular-nums; background: var(--color-paper-2); }
 .sheet.is-tight .b-due-table td { padding-top: 2pt; padding-bottom: 2pt; line-height: 1.22; }
 .sheet.is-tight .b-cond { line-height: 1.22; }
 .sheet.is-tight .b-table td { line-height: 1.22; }
-.sheet.is-tighter .b-table, .sheet.is-tighter .b-cond, .sheet.is-tighter .b-notes dl, .sheet.is-tighter .b-next, .sheet.is-tighter .b-ask, .sheet.is-tighter .b-key, .sheet.is-tighter .b-alert { font-size: var(--pt-xs); }
+.sheet.is-tighter .b-table, .sheet.is-tighter .b-cond, .sheet.is-tighter .b-ask, .sheet.is-tighter .b-key, .sheet.is-tighter .b-alert { font-size: var(--pt-xs); }
 .sheet.is-tighter .b-alert { padding-top: 1pt; padding-bottom: 1pt; }
 .sheet.is-tighter { gap: 3pt; }
 
