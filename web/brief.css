@@ -77,11 +77,23 @@ body { font-variant-numeric: tabular-nums; background: var(--color-paper-2); }
 .b-duties .duty-cite::before { content: " "; }
 .b-duties .cite { color: var(--color-ink-2); }
 
+.b-due-table { width: 100%; border-collapse: collapse; font-size: var(--pt-sm); line-height: 1.3; }
+.b-due-table th { text-align: left; font-weight: 800; border-bottom: var(--rule-bar) solid var(--color-ink); padding: 1pt 6pt 1pt 0; }
+.b-due-table td { vertical-align: top; border-bottom: var(--rule-hair) solid var(--color-rule); padding: 3pt 6pt 3pt 0; }
+.b-due-table .b-due { font-weight: 800; white-space: nowrap; }
+.b-due-table th:nth-child(2) { width: 34%; }
+.b-due-table th:nth-child(3) { width: 30%; }
+.b-due-table .b-answer { width: 24%; border-bottom: var(--rule-hair) solid var(--color-ink-2); }
+.b-due-table .cite { color: var(--color-ink-2); }
+.b-cond { margin: 0; padding-left: 10pt; display: grid; gap: 1pt; font-size: var(--pt-sm); line-height: 1.3; }
+.b-cond .cite { color: var(--color-ink-2); }
 .b-caveats ul { margin: 0; padding-left: 10pt; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2pt 22pt; font-size: var(--pt-md); line-height: 1.3; }
 .b-foot { margin-top: auto; padding-top: 4pt; border-top: var(--rule-hair) solid var(--color-ink); font-size: var(--pt-xs); color: var(--color-ink-2); display: grid; gap: 1pt; overflow-wrap: anywhere; }
 
 .state { display: grid; gap: var(--space-sm); }
 .sheet.is-tight { gap: 4pt; line-height: 1.25; }
+.sheet.is-tight .b-due-table td { padding-top: 2pt; padding-bottom: 2pt; line-height: 1.22; }
+.sheet.is-tight .b-cond { line-height: 1.22; }
 .sheet.is-tight .b-duties .duty { line-height: 1.22; padding: 1pt 0; }
 
 @page { size: letter; margin: 0; }

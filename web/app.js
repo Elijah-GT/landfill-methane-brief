@@ -40,7 +40,8 @@
       btn.addEventListener("click", function () {
         var id = (currentSite && currentSite.id) || D.sites[0].id;
         keepFocus = true; // switching range keeps focus on the switch, unlike picking a site
-        window.location.hash = L.hashFor(id, btn.getAttribute("data-range")).slice(1);
+        var N = window.LMBNotice, keep = N ? N.toHash(N.fromHash(window.location.hash)) : "";
+        window.location.hash = (L.hashFor(id, btn.getAttribute("data-range")) + keep).slice(1);
       });
     });
   }
@@ -236,6 +237,126 @@
     ]);
   }
 
+  // ---------- after a CARB notice ----------
+  function localToday() {
+    var now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+  }
+  function checklistItem(id) {
+    var C = window.LMB_CHECKLIST, hit = null;
+    (C ? C.groups : []).forEach(function (g) { g.items.forEach(function (it) { if (it.id === id) hit = it; }); });
+    return hit;
+  }
+  function citeLink(id) {
+    var it = checklistItem(id);
+    return it ? L.el("a", { class: "cite", href: L.regPageUrl(it.page), rel: "noopener", target: "_blank" }, [
+      it.section + ", p. " + it.page, L.el("span", { class: "visually-hidden", text: " (opens the regulation in a new tab)" })
+    ]) : null;
+  }
+
+  function noticePanel(full) {
+    var N = window.LMBNotice;
+    if (!N) return null;
+    var state = N.fromHash(window.location.hash) || { date: "", type: "unknown", carb: "" };
+    var out = L.el("div", { class: "notice-out", "aria-live": "polite" });
+
+    var dateIn = L.el("input", { id: "notice-date", class: "field-input", type: "date", value: state.date || "", min: "2020-01-01", max: "2099-12-31", "aria-describedby": "notice-date-hint" });
+    var carbIn = L.el("input", { id: "notice-carb", class: "field-input", type: "text", value: state.carb || "", maxlength: "40", autocomplete: "off", spellcheck: "false" });
+    var radios = Object.keys(N.TYPES).map(function (k) {
+      var r = L.el("input", { type: "radio", name: "notice-type", id: "notice-type-" + k, value: k });
+      if (k === state.type) r.checked = true;
+      return L.el("label", { class: "choice", for: "notice-type-" + k }, [r, " " + N.TYPES[k]]);
+    });
+    var clear = L.el("button", { type: "button", class: "btn btn--small", text: "Clear" });
+
+    function read() {
+      var checked = document.querySelector('input[name="notice-type"]:checked');
+      return { date: dateIn.value, type: checked ? checked.value : "unknown", carb: carbIn.value.trim().replace(/[^A-Za-z0-9 _.\-]/g, "").slice(0, 40) };
+    }
+    function update() {
+      var st = read(), valid = N.parseISO(st.date) != null;
+      var extra = valid ? N.toHash(st) : "";
+      history.replaceState(null, "", L.hashFor(full.id, range) + extra);
+      var briefBtn = detailEl.querySelector(".detail-head .btn--primary");
+      if (briefBtn) briefBtn.setAttribute("href", "brief.html" + L.hashFor(full.id, range) + extra);
+      renderNoticeOut(out, st, valid);
+    }
+    [dateIn, carbIn].forEach(function (i) { i.addEventListener("input", update); });
+    radios.forEach(function (lab) { lab.querySelector("input").addEventListener("change", update); });
+    clear.addEventListener("click", function () {
+      dateIn.value = ""; carbIn.value = "";
+      document.getElementById("notice-type-unknown").checked = true;
+      update(); dateIn.focus();
+    });
+
+    var form = L.el("div", { class: "notice-form" }, [
+      L.el("div", { class: "field" }, [
+        L.el("label", { for: "notice-date", class: "field-label", text: "Date the operator received CARB’s notice" }),
+        dateIn,
+        L.el("p", { id: "notice-date-hint", class: "field-hint", text: "Ask the operator, or check CARB’s CalSMP dashboard. The notice is an email from CARB with an ID number and the plume’s location." })
+      ]),
+      L.el("fieldset", { class: "field" }, [L.el("legend", { class: "field-label", text: "Landfill type" })].concat(radios)),
+      L.el("div", { class: "field" }, [
+        L.el("label", { for: "notice-carb", class: "field-label", text: "CARB ID number (optional)" }), carbIn
+      ]),
+      L.el("div", { class: "field field--end" }, [clear])
+    ]);
+    renderNoticeOut(out, state, N.parseISO(state.date) != null);
+    return L.el("section", { class: "block notice", "aria-labelledby": "notice-title" }, [
+      L.el("h2", { id: "notice-title", text: "After a CARB notice: due dates and what to ask" }),
+      L.el("p", { class: "lede", text: "If CARB has notified this landfill’s operator of a plume, enter the date the notice arrived to see when each step is due under the 2027 rule, and what to ask the operator." }),
+      form, out
+    ]);
+  }
+
+  function renderNoticeOut(out, st, valid) {
+    var N = window.LMBNotice;
+    out.textContent = "";
+    if (!valid) {
+      out.appendChild(L.el("p", { class: "note", text: "Enter the date the notice arrived to see the due dates." }));
+      return;
+    }
+    var today = localToday(), s = N.steps(st.date, st.type);
+    if (st.date < N.EFFECTIVE) {
+      out.appendChild(L.el("p", { class: "range-note", text: "This date is before the amended rule takes effect on " + L.fmtDate(N.EFFECTIVE) + ". The due dates below come from the amended rule and may not apply to an earlier notice." }));
+    }
+    if (st.date > today) {
+      out.appendChild(L.el("p", { class: "range-note", text: "This date is in the future. Check that it is the date the operator received the notice." }));
+    }
+    var both = st.type === "unknown";
+    var rows = s.dated.map(function (d) {
+      var where = N.standing(d.due, today);
+      return L.el("tr", { class: "due--" + where.key }, [
+        L.el("td", {}, [L.el("span", { class: "due-date", text: L.fmtDate(d.due) }), L.el("span", { class: "due-standing", text: where.text })]),
+        L.el("td", {}, [
+          both ? L.el("span", { class: "due-type", text: d.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null,
+          d.what + " (" + d.days + " days after the notice). ", citeLink(d.item)
+        ]),
+        L.el("td", { text: d.ask })
+      ]);
+    });
+    out.appendChild(L.el("div", { class: "table-wrap", role: "region", "aria-label": "Due dates after the notice", tabindex: "0" }, [
+      L.el("table", { class: "table notice-table" }, [
+        L.el("caption", { class: "visually-hidden", text: "Due dates after a CARB notice received " + L.fmtDate(st.date) }),
+        L.el("thead", {}, [L.el("tr", {}, [
+          L.el("th", { scope: "col", text: "Due" }), L.el("th", { scope: "col", text: "Step and rule" }), L.el("th", { scope: "col", text: "Ask the operator" })
+        ])]),
+        L.el("tbody", {}, rows)
+      ])
+    ]));
+    if (s.conditional.length) {
+      out.appendChild(L.el("h3", { class: "notice-sub", text: (both ? "If controlled, and " : "") + "depending on what the survey finds" }));
+      out.appendChild(L.el("ul", { class: "notice-cond" }, s.conditional.map(function (c) {
+        return L.el("li", {}, [
+          L.el("p", {}, [c.what + ". ", citeLink(c.item)]),
+          L.el("p", { class: "notice-ask" }, ["Ask: " + c.ask])
+        ]);
+      })));
+    }
+    out.appendChild(L.el("p", { class: "note", text: "Due dates are the date the notice arrived plus the number of calendar days the rule gives. The rule does not say whether a weekend or holiday moves a due date, so confirm exact dates with CARB. A passed date is a prompt to ask, not a finding that a step was missed." +
+      (st.carb ? " CARB ID: " + st.carb + "." : "") }));
+  }
+
   function chartOpts() {
     return range === "all" ? {} : { from: D.recent_since, to: D.fetched_at.slice(0, 10) };
   }
@@ -257,7 +378,7 @@
     var head = L.el("header", { class: "detail-head" }, [
       L.el("div", { class: "detail-title" }, [L.el("h1", { text: site.name }), meta]),
       L.el("div", { class: "actions" }, [
-        L.el("a", { class: "btn btn--primary", href: "brief.html" + L.hashFor(site.id, range), text: "Generate one-page brief" }),
+        L.el("a", { class: "btn btn--primary", href: "brief.html" + L.hashFor(site.id, range) + (window.LMBNotice ? window.LMBNotice.toHash(window.LMBNotice.fromHash(window.location.hash)) : ""), text: "Generate one-page brief" }),
         L.el("a", { class: "btn", href: L.LINKS.calsmp, rel: "noopener", target: "_blank" }, [
           "Check CARB notices", L.el("span", { class: "visually-hidden", text: " on the CalSMP dashboard (opens in a new tab)" })
         ])
@@ -330,6 +451,10 @@
       ]));
       window.LMBChart.render(chartBox, site, chartOpts());
     }
+
+    // after a CARB notice
+    var notice = noticePanel(full);
+    if (notice) detailEl.appendChild(notice);
 
     // checklist
     var dutiesBox = L.el("div", { class: "checklist" });

@@ -84,6 +84,28 @@ h3 { font-size: var(--text-md); }
 .filter-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .filter-count { font-size: var(--text-sm); color: var(--color-muted); }
 .site-list li[hidden] { display: none; }
+
+/* ---------- after a CARB notice ---------- */
+.notice-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-md) var(--space-lg); align-items: start; padding: var(--space-md); border: var(--rule-bar) solid var(--color-ink); background: var(--color-paper-3); }
+.field { display: grid; gap: var(--space-2xs); margin: 0; padding: 0; border: 0; min-width: 0; }
+.field--end { align-self: end; justify-items: start; }
+.field-label { font-size: var(--text-sm); font-weight: 800; padding: 0; }
+.field-hint { font-size: var(--text-xs); color: var(--color-muted); }
+.field-input { min-height: 44px; padding: 0 var(--space-sm); border: var(--rule-bar) solid var(--color-ink); border-radius: 0; background: var(--color-paper); color: var(--color-ink); font: 500 var(--text-md)/1.2 var(--font-body); width: 100%; }
+.field-input:hover { background: var(--color-paper-2); }
+.field-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.choice { display: flex; gap: var(--space-xs); align-items: baseline; font-size: var(--text-sm); cursor: pointer; }
+.choice input { accent-color: var(--color-ink); }
+.choice input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.notice-out { display: grid; gap: var(--space-sm); }
+.notice-table td { padding-right: var(--space-md); }
+.due-date { display: block; font-weight: 800; white-space: nowrap; }
+.due-standing { display: block; font-size: var(--text-xs); color: var(--color-muted); }
+.due--today .due-standing, .due--passed .due-standing { color: var(--color-ink); font-weight: 800; }
+.due-type { font-weight: 800; }
+.notice-sub { font-size: var(--text-md); }
+.notice-cond { margin: 0; padding-left: var(--space-md); display: grid; gap: var(--space-xs); max-width: 80ch; }
+.notice-ask { color: var(--color-ink-2); font-size: var(--text-sm); }
 /* The list draws the top rule, so the first visible row has one even when the filter hides rows above it. */
 .site-list { list-style: none; margin: 0; padding: 0; display: grid; align-content: start; border-top: var(--rule-bar) solid var(--color-ink); }
 .site-list[data-empty] { border-top: 0; }

@@ -21,6 +21,14 @@ Not merged into `main`; the submitted site stays the Sacramento-region version u
 * All 53 briefs were printed to PDF with headless Chrome: each is exactly one US Letter page.
 * Unnamed sites now get IDs from their coordinates (`site-37-755-121-647`), so links survive a refresh.
 
+## After-notice follow-up (statewide branch)
+
+* Job: once CARB has notified an operator, show the analyst what is due when and what to ask. Enter the receipt date, landfill type (controlled, uncontrolled, not sure) and optional CARB ID; the state lives in the URL (`&notice=YYYY-MM-DD&type=…&carb=…`) and carries into the brief.
+* Dated steps, checked against the clean copy: survey within 10 calendar days of receiving the notice (§ 95469(b)(2)(A), p. 27) and report within 15 (§ 95470(b)(7)(A), p. 48) for controlled landfills; survey within 30 (§ 95469(b)(3)(A), p. 28) and report within 35 (§ 95470(b)(7)(C), p. 49) for uncontrolled ones. Repair steps (5 and 10 days from a reading or leak; 5 days after a successful re-test) depend on facts the analyst will not have, so they appear as rules plus questions, not dates.
+* **Not in the regulation:** how to count days. The text never says whether the receipt day counts or whether a weekend or holiday moves a due date. The app uses receipt date + N and says so on screen and on the brief. California's general rules for computing time (Code of Civil Procedure §§ 10–12a) were not checked for whether they apply here.
+* Logic in `web/notice.js` (no DOM), tested through Node by `pipeline/tests/test_notice.py` (month ends, leap years, the "not sure" set, neutral wording for passed dates, hash parsing and bad input). The questions are written for this tool; each step cites a checklist item.
+* Dates before Jan 1, 2027 and future dates show a warning; nothing is stored anywhere but the URL.
+
 ## Recent window (statewide branch)
 
 * The app and brief open on the 24 months before the fetch date (`recent_since` = 2024-11-22 for this snapshot; `build_sites.recent_since`, tested including Feb 29). Each site carries `recent` statistics computed by the same `site_stats` as the full record; the site's location stays the full-record centre.

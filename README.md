@@ -13,7 +13,8 @@ From January 1, 2027, California landfill operators must investigate and fix met
 1. **Pick a landfill.** The app groups 2,707 waste-sector methane plumes seen in California (Sep 2016 to Oct 2026) into 53 sites, names 41 of them from EPA and CalRecycle records, and shows them on a searchable list and a map that expands to fill the window.
 2. **See recent activity first, history on request.** By default every number, the list order, the map and the chart cover the last 24 months before the data was fetched (since Nov 22, 2024 in this snapshot); a switch shows the full record since 2016. Count, date range, median and largest emission rate with its published uncertainty, and a timeline with one dot per detection and an uncertainty bar. Detections whose rate was not published are shown, not dropped.
 3. **See what the 2027 rule asks after a CARB notice.** Eleven operator duties, plus the notice that triggers them, each with its deadline, its section number linked to the page of the regulation, and the verbatim regulation text.
-4. **Generate a brief.** A print-ready, one-page US Letter brief with data dates, the 30-day publication lag, caveats and credits. Print it or save it as a PDF.
+4. **Follow up after a CARB notice.** Enter the date the operator received CARB's notice, the landfill type and (optionally) CARB's ID number. The app gives the due date of each dated step (survey in 10 days and report in 15 at controlled landfills; 30 and 35 at uncontrolled ones), where each stands today, the steps that depend on what the survey finds, and a question to ask the operator for each, all cited. The brief then prints these as a follow-up sheet with a column for the operator's answers. A passed date is worded as a prompt to ask, never as a finding.
+5. **Generate a brief.** A print-ready, one-page US Letter brief with data dates, the 30-day publication lag, caveats and credits. Print it or save it as a PDF.
 
 ## How it complements CARB's CalSMP dashboard
 
@@ -85,6 +86,7 @@ web/data/checklist.js (hand-built from the regulation) ─>  brief.html (one pri
 
 ## Limitations
 
+* **Due dates assume simple counting.** The rule says "within N calendar days of receiving" the notice but not how to count; the app adds N days to the receipt date and does not move dates for weekends or holidays. Confirm exact dates with CARB.
 * **Not legal advice and not a compliance finding.** The tool reports detections and summarises what the rule requires. It never says a landfill is or is not meeting the rule.
 * **Only CARB's notification triggers the duties** (§ 95469(b)). A plume in the public data does not, by itself.
 * **About 30 days behind.** Carbon Mapper publishes plumes about 30 days after observation; the newest in this snapshot is from Sep 15, 2026. This is a history and accountability tool, not an alert system.

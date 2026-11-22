@@ -20,7 +20,8 @@
   if (!site) { fail("No landfill selected", "Open this brief from a landfill in the app, so the address ends with #site= and the landfill’s id."); return; }
 
   var range = D.recent_since ? L.rangeFromHash() : "all";
-  document.getElementById("back").setAttribute("href", "index.html" + L.hashFor(site.id, range));
+  var N = window.LMBNotice, notice = N ? N.fromHash(window.location.hash) : null;
+  document.getElementById("back").setAttribute("href", "index.html" + L.hashFor(site.id, range) + (notice ? N.toHash(notice) : ""));
   document.title = "Methane brief: " + site.name;
 
   // The brief follows the range chosen in the app. With no detections in the recent window,
@@ -52,7 +53,8 @@
       row("Data fetched", L.fmtDate(D.fetched_at)),
       row("Period", range === "all" ? "Full record since " + L.fmtDate(site.first_date)
         : "Last " + D.recent_months + " months, since " + L.fmtDate(D.recent_since)),
-      row("Detections through", L.fmtDate(site.last_date))
+      row("Detections through", L.fmtDate(site.last_date)),
+      notice ? row("CARB notice received", L.fmtDate(notice.date) + (notice.carb ? ", ID " + notice.carb : "")) : null
     ])
   ]));
 
@@ -96,13 +98,51 @@
   var chartH = 160;
   drawChart(chartH);
 
-  // checklist
-  var duties = el("div", { class: "b-duties" });
-  sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-duty-title" }, [
-    el("h2", { id: "b-duty-title", text: "What California’s 2027 rule asks after a CARB notice" }),
-    duties
-  ]));
-  window.LMBChecklist.render(duties, { compact: true });
+  // checklist, or with a notice date: the dated follow-up steps and what to ask
+  function cite(id) {
+    var hit = null;
+    window.LMB_CHECKLIST.groups.forEach(function (g) { g.items.forEach(function (it) { if (it.id === id) hit = it; }); });
+    return hit ? hit.section + ", p. " + hit.page : "";
+  }
+  if (notice) {
+    var s = N.steps(notice.date, notice.type), both = notice.type === "unknown";
+    var rows = s.dated.map(function (d) {
+      return el("tr", {}, [
+        el("td", { class: "b-due", text: L.fmtDate(d.due) }),
+        el("td", {}, [
+          both ? el("strong", { text: d.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null,
+          d.short + " (" + d.days + " days). ", el("span", { class: "cite", text: cite(d.item) })
+        ]),
+        el("td", { text: d.ask }),
+        el("td", { class: "b-answer" })
+      ]);
+    });
+    var cond = s.conditional.map(function (c) {
+      return el("li", {}, [c.short + ". ", el("span", { class: "cite", text: cite(c.item) + ". " }), el("em", { text: "Ask: " + c.ask })]);
+    });
+    sheet.appendChild(el("section", { class: "b-block b-notice", "aria-labelledby": "b-duty-title" }, [
+      el("h2", { id: "b-duty-title", text: "Follow-up after CARB’s notice of " + L.fmtDate(notice.date) +
+        (notice.type === "controlled" ? " (controlled landfill)" : notice.type === "uncontrolled" ? " (uncontrolled landfill)" : " (landfill type not confirmed)") }),
+      notice.date < N.EFFECTIVE ? el("p", { class: "b-key", text: "This notice predates the amended rule (effective " + L.fmtDate(N.EFFECTIVE) + "); these due dates may not apply." }) : null,
+      el("table", { class: "b-due-table" }, [
+        el("thead", {}, [el("tr", {}, [
+          el("th", { scope: "col", text: "Due" }), el("th", { scope: "col", text: "Step and rule" }),
+          el("th", { scope: "col", text: "Ask the operator" }), el("th", { scope: "col", text: "Operator’s answer" })
+        ])]),
+        el("tbody", {}, rows)
+      ]),
+      cond.length ? el("p", { class: "b-key", text: (both ? "If controlled, and depending" : "Depending") + " on what the survey finds:" }) : null,
+      cond.length ? el("ul", { class: "b-cond" }, cond) : null,
+      el("p", { class: "b-key", text: "Due date = date the notice arrived + the rule’s calendar days, not moved for weekends or holidays (the rule does not say); confirm with CARB. Duties start only with CARB’s notice (§ 95469(b), p. 26)." })
+    ]));
+  } else {
+    var duties = el("div", { class: "b-duties" });
+    sheet.appendChild(el("section", { class: "b-block", "aria-labelledby": "b-duty-title" }, [
+      el("h2", { id: "b-duty-title", text: "What California’s 2027 rule asks after a CARB notice" }),
+      duties
+    ]));
+    window.LMBChecklist.render(duties, { compact: true });
+  }
 
   // caveats and credits
   var lag = D.publication_lag_days;
@@ -152,7 +192,8 @@
     sheet.classList.remove("is-tight");
     chartH = 160;
     drawChart(chartH);
-    while (contentHeight() > limit && chartH > 130) {
+    var minChart = notice ? 110 : 130; // the follow-up table needs more room than the checklist
+    while (contentHeight() > limit && chartH > minChart) {
       chartH -= 10;
       drawChart(chartH);
     }
