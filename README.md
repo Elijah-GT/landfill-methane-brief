@@ -1,6 +1,6 @@
-# Landfill methane brief
+# Methane Docket
 
-**Live:** https://elijah-gt.github.io/landfill-methane-brief/
+**Live:** https://elijah-gt.github.io/methane-docket/
 
 A one-page methane brief for any California landfill, built from public aircraft and satellite plume data, for the city and county staff who oversee or contract with landfills.
 
@@ -26,8 +26,8 @@ CARB's [CalSMP dashboard](https://ww2.arb.ca.gov/our-work/programs/california-sa
 Nothing to install. The data is bundled, so it works offline (map tiles excepted).
 
 ```bash
-git clone https://github.com/Elijah-GT/landfill-methane-brief.git
-cd landfill-methane-brief
+git clone https://github.com/Elijah-GT/methane-docket.git
+cd methane-docket
 ```
 
 Then either open `web/index.html` in a browser, or serve it:

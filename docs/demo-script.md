@@ -1,7 +1,7 @@
 # Demo video script (2 min 30 s target)
 
 Record at 1280×800 or larger, browser zoom 100%. Use the live site:
-https://elijah-gt.github.io/landfill-methane-brief/ (press Ctrl+Shift+R once before recording).
+https://elijah-gt.github.io/methane-docket/ (press Ctrl+Shift+R once before recording).
 The slide deck has speaker notes for every slide; this script interleaves slides and the live app.
 
 Before recording: close other tabs, open `index.html#site=sunshine-canyon-landfill`, scroll to the top, and have the deck open on its cover.

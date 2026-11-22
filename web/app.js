@@ -513,7 +513,7 @@
 
     // selection state
     markCurrent(site.id);
-    document.title = site.name + ": methane plume history and the 2027 rule";
+    document.title = site.name + ": Methane Docket";
   }
 
   function route(focus) {

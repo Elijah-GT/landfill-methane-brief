@@ -22,7 +22,7 @@
   var range = D.recent_since ? L.rangeFromHash() : "all";
   var N = window.LMBNotice, notice = N ? N.fromHash(window.location.hash) : null;
   document.getElementById("back").setAttribute("href", "index.html" + L.hashFor(site.id, range) + (notice ? N.toHash(notice) : ""));
-  document.title = "Methane brief: " + site.name;
+  document.title = "Methane Docket brief: " + site.name;
 
   // The brief follows the range chosen in the app. With no detections in the recent window,
   // it says so and shows the full history instead, so the page is never blank.
@@ -39,7 +39,7 @@
   // header
   sheet.appendChild(el("header", { class: "b-head" }, [
     el("div", { class: "b-title" }, [
-      el("p", { class: "b-kicker", text: "Methane plume brief for local government staff" }),
+      el("p", { class: "b-kicker", text: "Methane Docket site brief for local government staff" }),
       el("h1", { text: site.name }),
       el("dl", { class: "b-meta" }, [
         site.official_name ? row("Registered name", site.official_name) : null,

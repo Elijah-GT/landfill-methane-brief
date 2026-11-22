@@ -52,7 +52,7 @@ def get_csv(year: int, retries: int = 3) -> list[dict]:
     last: Exception | None = None
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(URL.format(year=year), headers={"User-Agent": "landfill-methane-brief/1.0"})
+            req = urllib.request.Request(URL.format(year=year), headers={"User-Agent": "methane-docket/1.0"})
             with urllib.request.urlopen(req, timeout=180) as resp:
                 return list(csv.DictReader(io.StringIO(resp.read().decode("utf-8", "replace"))))
         except (urllib.error.URLError, TimeoutError) as err:

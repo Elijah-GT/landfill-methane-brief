@@ -48,7 +48,7 @@ def build_url(bbox: tuple[float, float, float, float], limit: int, offset: int) 
 
 
 def get_json(url: str, retries: int = 3) -> dict:
-    headers = {"Accept": "application/json", "User-Agent": "landfill-methane-brief/1.0"}
+    headers = {"Accept": "application/json", "User-Agent": "methane-docket/1.0"}
     token = os.environ.get("CARBONMAPPER_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
