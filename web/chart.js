@@ -41,7 +41,10 @@
 
   function render(container, site, opts) {
     opts = opts || {};
-    var W = opts.width || 720, H = opts.height || 280;
+    // Draw at the container's own width (within limits) so labels stay readable on phones.
+    var avail = container.clientWidth ? container.clientWidth - 2 * 12 : 720;
+    var W = opts.width || Math.max(340, Math.min(720, avail));
+    var H = opts.height || (W < 520 ? 240 : 280);
     var m = { l: 64, r: 16, t: 32, b: 64 };
     var pw = W - m.l - m.r, ph = H - m.t - m.b;
     var firstYear = +site.first_date.slice(0, 4), lastYear = +site.last_date.slice(0, 4);
@@ -78,7 +81,7 @@
     svg.appendChild(unit);
 
     // year ticks
-    var span = lastYear - firstYear + 1, every = span > 8 ? 2 : 1;
+    var span = lastYear - firstYear + 1, every = span > (W < 520 ? 4 : 8) ? 2 : 1;
     for (var yr = firstYear; yr <= lastYear + 1; yr++) {
       var xx = X(Date.UTC(yr, 0, 1));
       svg.appendChild(svgEl("line", { x1: xx, x2: xx, y1: m.t + ph, y2: m.t + ph + 6, class: "chart-axis" }));

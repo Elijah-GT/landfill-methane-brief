@@ -207,4 +207,14 @@
   initMap();
   route(false);
   window.addEventListener("hashchange", function () { route(true); });
+  var lastW = window.innerWidth, timer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      if (Math.abs(window.innerWidth - lastW) < 40) return;
+      lastW = window.innerWidth;
+      var box = detailEl.querySelector(".chart-box"), site = L.siteById(L.siteIdFromHash()) || D.sites[0];
+      if (box) window.LMBChart.render(box, site);
+    }, 200);
+  });
 })();
