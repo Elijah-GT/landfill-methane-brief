@@ -6,6 +6,8 @@
 
 ## Inspiration
 
+**Why it matters.** Inside a landfill, microbes break down food and yard waste without oxygen and make methane. Where it escapes, it drifts downwind as a plume that aircraft and satellites can now see and measure. Methane is about 80 times as potent as carbon dioxide (U.S. EPA) and lasts only 7 to 12 years in the air, so cutting it slows warming this decade. Landfills are California's second-largest methane source, about a fifth of the total, and their gas also carries toxic air contaminants and odour-causing compounds to the people who live nearby (CARB). Finding and fixing the biggest plumes is one of the fastest climate wins available, and the local staff who oversee landfills are the people best placed to follow up.
+
 From January 1, 2027, California’s amended Landfill Methane Regulation requires landfill operators to act when CARB detects a methane plume remotely and notifies them: a ground survey within 10 days and a report within 15 (30 and 35 days at uncontrolled landfills). The plume data is public, but it sits in a research catalog, the duties sit in a 74-page regulation, and the city and county staff who oversee landfills have no quick way to see one site’s record or follow a notice.
 
 ## What it does

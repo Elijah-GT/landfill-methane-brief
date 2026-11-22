@@ -4,6 +4,10 @@
 
 A one-page methane brief for any California landfill, built from public aircraft and satellite plume data, for the city and county staff who oversee or contract with landfills.
 
+## Why it matters
+
+Inside a landfill, microbes break down food and yard waste without oxygen and make methane. Where that gas escapes, it drifts downwind as a **plume**, which spectrometers on aircraft and satellites can see by the light it absorbs and measure in kilograms per hour. Methane is about 80 times as potent as carbon dioxide ([U.S. EPA](https://www.epa.gov/node/292607)) and stays in the air only 7 to 12 years, so cutting it slows warming this decade. Landfills are California's second-largest methane source, about a fifth of the state's total, and landfill gas also carries toxic air contaminants and odour-causing compounds ([CARB factsheet, Sep 2025](https://ww2.arb.ca.gov/sites/default/files/2025-09/LMR_Factsheet_2025-09_0.pdf); [CARB program page](https://ww2.arb.ca.gov/our-work/programs/landfill-methane-regulation/about)). California aims to cut methane 40% below 2013 levels by 2030.
+
 ## The problem, in two sentences
 
 From January 1, 2027, California landfill operators must investigate and fix methane plumes that CARB detects remotely and tells them about, starting with a ground survey within 10 days of CARB's notice (30 days at uncontrolled landfills). But the plume history, each site's record and the new legal duties live in separate places, so a local solid-waste analyst cannot quickly see how often their landfill has leaked, how large the leaks were, or what the rule now asks of the operator.
