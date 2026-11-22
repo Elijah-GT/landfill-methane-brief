@@ -1,0 +1,32 @@
+[
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "wayfind",
+  "axes": "light/mono/cool",
+  "nav": "top bar",
+  "footer": "ink band credits",
+  "imagery": "none (data)",
+  "photos": [],
+  "entry": "site list + map rail",
+  "sections": [
+   "rail",
+   "detail head",
+   "stats",
+   "timeline",
+   "checklist",
+   "about"
+  ],
+  "signature": "detection timeline with uncertainty whiskers",
+  "waived": [
+   "64",
+   "48 vendor",
+   "24b vendor",
+   "62 vendor",
+   "40 vendor"
+  ],
+  "prompt": "landfill methane brief",
+  "date": "2026-11-22",
+  "mode": "build"
+ }
+]
