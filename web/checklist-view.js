@@ -53,7 +53,7 @@
 
     if (!opts.compact) container.appendChild(L.el("p", { class: "note" }, [
       "Summarised from CARB’s ",
-      L.el("a", { href: C.regulation.url, rel: "noopener", target: "_blank" }, ["unofficial clean copy of the amended regulation"]),
+      L.el("a", { href: C.regulation.url, rel: "noopener", target: "_blank" }, ["unofficial clean copy of the amended regulation", L.el("span", { class: "visually-hidden", text: " (opens in a new tab)" })]),
       ", effective January 1, 2027. " + C.regulation.note
     ]));
   }

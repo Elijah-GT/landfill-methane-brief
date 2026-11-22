@@ -1,4 +1,4 @@
-from pipeline.build_sites import build, publication_lag_days, slugify
+from pipeline.build_sites import build, km_to_bbox_edge, publication_lag_days, slugify
 
 KM = 1 / 111.195
 
@@ -63,3 +63,28 @@ def test_publication_lag():
 
 def test_slugify():
     assert slugify("Kiefer Landfill (Sacramento)") == "kiefer-landfill-sacramento"
+
+
+def test_nearby_other_sector_plumes_are_reported_not_counted():
+    snap = dict(SNAP, plumes=SNAP["plumes"] + [
+        plume("x", 38.5 + 0.3 * KM, -121.2, "2025-06-01T18:00:00Z", "2025-07-01T18:00:00Z", sector="other")])
+    top = build(snap, NAMES)["sites"][0]
+    assert top["plume_count"] == 3
+    assert top["nearby_other_sector"] == 1
+
+
+def test_waste_only_date_range():
+    out = build(SNAP, NAMES)
+    assert out["waste_oldest_observation"] == "2024-01-01"
+    assert out["waste_newest_observation"] == "2025-06-01"
+
+
+def test_km_to_bbox_edge():
+    assert km_to_bbox_edge(38.0 + 1 * KM, -121.5, [-122, 38, -121, 39]) < 1.01
+    assert km_to_bbox_edge(38.5, -121.5, [-122, 38, -121, 39]) > 40
+
+
+def test_edge_site_warns(capsys):
+    snap = dict(SNAP, bbox=[-121.3, 38.499, -121.1, 38.6])
+    build(snap, NAMES)
+    assert "fetch box edge" in capsys.readouterr().err

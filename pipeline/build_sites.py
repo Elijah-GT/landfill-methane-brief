@@ -32,6 +32,7 @@ OUT = ROOT / "web" / "data" / "sites.js"
 WASTE_SECTOR = "6A"
 CLUSTER_KM = 1.0
 NAME_RADIUS_KM = 3.0
+EDGE_WARN_KM = 3.0
 
 
 def _parse(ts: str) -> datetime:
@@ -51,6 +52,17 @@ def publication_lag_days(plumes: list[dict], since: str = "2025-01-01") -> dict:
     if not lags:
         return {"since": since, "n": 0, "min": None, "median": None}
     return {"since": since, "n": len(lags), "min": round(min(lags), 1), "median": round(median(lags), 1)}
+
+
+def km_to_bbox_edge(lat: float, lon: float, bbox: list[float] | None) -> float | None:
+    """Distance from a point to the nearest side of the fetch box (min lon, min lat, max lon, max lat)."""
+    if not bbox:
+        return None
+    min_lon, min_lat, max_lon, max_lat = bbox
+    return min(
+        haversine_km(lat, lon, min_lat, lon), haversine_km(lat, lon, max_lat, lon),
+        haversine_km(lat, lon, lat, min_lon), haversine_km(lat, lon, lat, max_lon),
+    )
 
 
 def plume_row(p: dict, lat: float, lon: float) -> dict:
@@ -74,6 +86,8 @@ def plume_row(p: dict, lat: float, lon: float) -> dict:
 def build(snapshot: dict, names: list[dict]) -> dict:
     all_plumes = snapshot["plumes"]
     waste = [p for p in all_plumes if p.get("sector") == WASTE_SECTOR]
+    other = [p for p in all_plumes if p.get("sector") != WASTE_SECTOR]
+    bbox = snapshot.get("bbox")
     sites = []
     used_ids: set[str] = set()
     for rank, idx in enumerate(cluster_points(waste, CLUSTER_KM), start=1):
@@ -86,6 +100,16 @@ def build(snapshot: dict, names: list[dict]) -> dict:
             site_id += "-b"
         used_ids.add(site_id)
         rows = [plume_row(p, stats["lat"], stats["lon"]) for p in members]
+        # Plumes Carbon Mapper put in another sector but within 1 km of this site's detections:
+        # not counted, but reported so the site's numbers are not read as complete.
+        nearby_other = sum(
+            1 for o in other
+            if any(haversine_km(o["lat"], o["lon"], m["lat"], m["lon"]) < CLUSTER_KM for m in members)
+        )
+        edge_km = min((km_to_bbox_edge(m["lat"], m["lon"], bbox) for m in members), default=None) if bbox else None
+        if edge_km is not None and edge_km < EDGE_WARN_KM:
+            print(f"warning: site {rank} has detections {edge_km:.1f} km from the fetch box edge; "
+                  "widen --bbox so its record is not cut off", file=sys.stderr)
         sites.append({
             "id": site_id,
             "rank": rank,
@@ -99,10 +123,13 @@ def build(snapshot: dict, names: list[dict]) -> dict:
             if named else None,
             **stats,
             "max_km_from_center": max(r["km_from_center"] for r in rows),
+            "nearby_other_sector": nearby_other,
+            "km_to_bbox_edge": round(edge_km, 1) if edge_km is not None else None,
             "plumes": rows,
         })
 
     observed = sorted(p["scene_timestamp"] for p in all_plumes)
+    waste_observed = sorted(p["scene_timestamp"] for p in waste)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "fetched_at": snapshot["fetched_at"],
@@ -114,6 +141,8 @@ def build(snapshot: dict, names: list[dict]) -> dict:
         "waste_plumes": len(waste),
         "oldest_observation": observed[0][:10] if observed else None,
         "newest_observation": observed[-1][:10] if observed else None,
+        "waste_oldest_observation": waste_observed[0][:10] if waste_observed else None,
+        "waste_newest_observation": waste_observed[-1][:10] if waste_observed else None,
         "publication_lag_days": publication_lag_days(all_plumes),
         "sites": sites,
     }

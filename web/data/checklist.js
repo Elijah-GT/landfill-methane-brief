@@ -22,7 +22,7 @@ window.LMB_CHECKLIST = {
   groups: [
     {
       id: "controlled",
-      title: "If the landfill has a gas collection and control system",
+      title: "If it is a controlled landfill or has a landfill gas control system",
       items: [
         {
           id: "survey-surface",
@@ -44,9 +44,9 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "fix-surface",
-          brief: "Any reading over 500 ppmv: start corrective action in 5 days, re-test in 10 days and at one month.",
-          duty: "If a surface reading is over the 500 ppmv limit (§ 95465(a)(1)), start corrective action within 5 days, re-test within 10 days, and re-test again one month after the first high reading.",
-          deadline: "Start within 5 days; re-test within 10 days and at one month",
+          brief: "Reading over 500 ppmv: start fixes in 5 days, re-test in 10, and at one month if clean. A second high reading repeats this; a third needs a CARB notice and a new well.",
+          duty: "If a surface reading is over the 500 ppmv limit (§ 95465(a)(1)): start corrective action within 5 calendar days and re-test within 10 calendar days. If the re-test is clean, re-test again one month after the first reading. A second exceedance repeats the 5- and 10-day steps; a third requires notifying CARB within 30 calendar days and installing a new or replacement well, unless CARB approves an alternative.",
+          deadline: "Start within 5 calendar days; re-test within 10",
           section: "§ 95469(b)(2)(B), applying § 95469(a)(1)(B)",
           quote: "Initiate corrective action within five calendar days of a measured exceedance ... and the location shall be re-monitored within 10 calendar days of the measured exceedance.",
           page: 22
@@ -62,8 +62,8 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "report-controlled",
-          brief: "Report results, locations and initial fixes to CARB, with CARB’s ID number.",
-          duty: "Report to CARB: the notice date and CARB ID number, the monitoring results, where each problem was found, and the initial corrective action.",
+          brief: "Report monitoring results, sources, an initial mitigation plan and possible causes to CARB, with CARB’s ID number.",
+          duty: "Report to CARB: the notice date and CARB ID number, the follow-up monitoring date and instrument, each exceedance and leak with its location and source, an initial mitigation plan for each (already fixed, or planned actions and completion date), and any activities that may have contributed to the plume.",
           deadline: "Within 15 calendar days of the notice",
           section: "§ 95470(b)(7)(A)",
           quote: "Within 15 calendar days after receiving the notification at a controlled MSW landfill: the date of the CARB notification; identification number provided by CARB in the notification",
@@ -77,6 +77,15 @@ window.LMB_CHECKLIST = {
           section: "§ 95470(b)(7)(B)",
           quote: "Within five calendar days after the re-monitoring that first shows each exceedance or component leak to be corrected: repair date, re-monitoring dates, and re-monitoring concentrations in ppmv.",
           page: 49
+        },
+        {
+          id: "keep-records",
+          brief: "Keep records 5 years, in California; give them to CARB within 5 business days on request.",
+          duty: "Keep electronic records of each exceedance and leak, its repair and re-tests, and the CARB ID number, for at least five years, stored in California.",
+          deadline: "Keep 5 years; provide to CARB within 5 business days on request",
+          section: "§ 95470(a)(1), (a)(1)(G), (a)(3)",
+          quote: "An owner or operator shall maintain the following records in electronic format for at least five years",
+          page: 37
         }
       ]
     },
@@ -125,16 +134,8 @@ window.LMB_CHECKLIST = {
           section: "§ 95470(b)(10)",
           quote: "Any report, or information submitted pursuant to this subarticle shall contain certification by a responsible official of truth, accuracy, and completeness.",
           page: 50
-        },
-        {
-          id: "keep-records",
-          brief: "Keep records 5 years, in California; give them to CARB within 5 business days on request.",
-          duty: "Keep electronic records of each exceedance and leak, its repair and re-tests, and the CARB ID number, for at least five years, stored in California.",
-          deadline: "Keep 5 years; provide to CARB within 5 business days on request",
-          section: "§ 95470(a)(1), (a)(1)(G), (a)(3)",
-          quote: "An owner or operator shall maintain the following records in electronic format for at least five years",
-          page: 37
         }
+
       ]
     }
   ]

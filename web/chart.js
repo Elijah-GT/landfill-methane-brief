@@ -12,12 +12,29 @@
     return n;
   }
 
-  function niceMax(v) {
-    if (!(v > 0)) return 100;
-    var mag = Math.pow(10, Math.floor(Math.log10(v)));
-    var steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
-    for (var i = 0; i < steps.length; i++) if (steps[i] * mag >= v) return steps[i] * mag;
-    return 10 * mag;
+  // Axis scale: a tick step of 1, 2, 2.5 or 5 x 10^n, with 3 to 5 intervals.
+  function niceScale(v) {
+    if (!(v > 0)) return { top: 100, n: 4 };
+    var mag = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+    var mult = [1, 2, 2.5, 5, 10, 20, 25, 50, 100];
+    for (var i = 0; i < mult.length; i++) {
+      var step = mult[i] * mag, n = Math.ceil(v / step);
+      if (n <= 5) return { top: n * step, n: Math.max(n, 1) };
+    }
+    return { top: 100 * mag * 5, n: 5 };
+  }
+
+  // Detections on the same day share an x position; spread them a few pixels
+  // apart (centred on the true date) so each dot and whisker stays visible.
+  function spread(list, X) {
+    var groups = {};
+    list.forEach(function (p) { (groups[p.date] = groups[p.date] || []).push(p); });
+    var out = new Map();
+    Object.keys(groups).forEach(function (d) {
+      var g = groups[d], n = g.length, stepPx = n > 1 ? Math.min(5, 24 / (n - 1)) : 0;
+      g.forEach(function (p, i) { out.set(p, X(t(p.observed)) + (i - (n - 1) / 2) * stepPx); });
+    });
+    return out;
   }
 
   function t(iso) { return Date.parse(iso.length === 10 ? iso + "T00:00:00Z" : iso); }
@@ -45,14 +62,15 @@
     var avail = container.clientWidth ? container.clientWidth - 2 * 12 : 720;
     var W = opts.width || Math.max(340, Math.min(720, avail));
     var H = opts.height || (W < 520 ? 240 : 280);
-    var m = { l: 64, r: 16, t: 32, b: 64 };
+    var m = { l: 64, r: 16, t: 32, b: H < 200 ? 52 : 64 };
     var pw = W - m.l - m.r, ph = H - m.t - m.b;
     var firstYear = +site.first_date.slice(0, 4), lastYear = +site.last_date.slice(0, 4);
     var x0 = Date.UTC(firstYear, 0, 1), x1 = Date.UTC(lastYear + 1, 0, 1);
     var rated = site.plumes.filter(function (p) { return p.rate_kg_h != null; });
-    var top = niceMax(Math.max.apply(null, [0].concat(rated.map(function (p) {
+    var scale = niceScale(Math.max.apply(null, [0].concat(rated.map(function (p) {
       return p.rate_kg_h + (p.uncertainty_kg_h || 0);
     }))));
+    var top = scale.top;
     var X = function (ms) { return m.l + (ms - x0) / (x1 - x0) * pw; };
     var Y = function (v) { return m.t + ph - v / top * ph; };
 
@@ -69,8 +87,8 @@
     svg.appendChild(desc);
 
     // horizontal grid and y labels
-    for (var i = 0; i <= 4; i++) {
-      var v = top / 4 * i, y = Y(v);
+    for (var i = 0; i <= scale.n; i++) {
+      var v = top / scale.n * i, y = Y(v);
       svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, class: i === 0 ? "chart-axis" : "chart-grid" }));
       var lab = svgEl("text", { x: m.l - 8, y: y + 4, class: "chart-label", "text-anchor": "end" });
       lab.textContent = window.LMB.numFmt.format(v);
@@ -93,27 +111,29 @@
     }
 
     // detections with no published rate, as a strip under the axis
-    var stripY = m.t + ph + 42;
+    var stripY = m.t + ph + (H < 200 ? 36 : 42);
     var withheld = site.plumes.filter(function (p) { return p.rate_kg_h == null; });
     var sl = svgEl("text", { x: m.l - 8, y: stripY + 4, class: "chart-label", "text-anchor": "end" });
     sl.textContent = "no rate";
     svg.appendChild(sl);
     svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: stripY, y2: stripY, class: "chart-grid" }));
+    var wx = spread(withheld, X);
     withheld.forEach(function (p) {
-      var cx = X(t(p.observed));
+      var cx = wx.get(p);
       svg.appendChild(svgEl("rect", { x: cx - 4, y: stripY - 4, width: 8, height: 8, class: "chart-withheld" }));
     });
 
     // uncertainty whiskers, then dots on top
+    var rx = spread(rated, X);
     rated.forEach(function (p) {
-      var cx = X(t(p.observed)), u = p.uncertainty_kg_h || 0;
+      var cx = rx.get(p), u = p.uncertainty_kg_h || 0;
       var ya = Y(Math.max(0, p.rate_kg_h - u)), yb = Y(p.rate_kg_h + u);
       svg.appendChild(svgEl("line", { x1: cx, x2: cx, y1: ya, y2: yb, class: "chart-whisker" }));
-      svg.appendChild(svgEl("line", { x1: cx - 3, x2: cx + 3, y1: yb, y2: yb, class: "chart-whisker" }));
-      svg.appendChild(svgEl("line", { x1: cx - 3, x2: cx + 3, y1: ya, y2: ya, class: "chart-whisker" }));
+      svg.appendChild(svgEl("line", { x1: cx - 2, x2: cx + 2, y1: yb, y2: yb, class: "chart-whisker" }));
+      svg.appendChild(svgEl("line", { x1: cx - 2, x2: cx + 2, y1: ya, y2: ya, class: "chart-whisker" }));
     });
     rated.forEach(function (p) {
-      var c = svgEl("circle", { cx: X(t(p.observed)), cy: Y(p.rate_kg_h), r: 4.5, class: "chart-dot" });
+      var c = svgEl("circle", { cx: rx.get(p), cy: Y(p.rate_kg_h), r: 3.5, class: "chart-dot" });
       var tip = svgEl("title");
       tip.textContent = window.LMB.fmtDate(p.date) + ": " + window.LMB.fmtRateUnc(p.rate_kg_h, p.uncertainty_kg_h) +
         " (" + window.LMB.platform(p.platform).label + ")";

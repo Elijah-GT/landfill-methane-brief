@@ -32,8 +32,8 @@
     return isNaN(d) ? iso : dateFmt.format(d);
   }
 
-  // Emission rates are rounded to 2 significant figures at most: the published
-  // uncertainty is typically 15 to 40 percent, so more digits would be false precision.
+  // Emission rates are rounded to 2 significant figures at most: in this data the
+  // published uncertainty is a median 32 percent of the rate, so more digits would be false precision.
   function round2sf(v) {
     if (v == null || !isFinite(v)) return null;
     if (v === 0) return 0;

@@ -24,8 +24,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest pipeline/tests -q
-      - name: Rebuild site data from the committed snapshot (offline)
-        run: python pipeline/build_sites.py
+      - name: Rebuild site data from the committed snapshot and check it matches the committed file
+        run: |
+          python pipeline/build_sites.py
+          git diff --ignore-matching-lines='"generated_at"' --exit-code -- web/data/sites.js
 
   deploy:
     needs: test

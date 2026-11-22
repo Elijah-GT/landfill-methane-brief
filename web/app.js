@@ -5,30 +5,31 @@
   var L = window.LMB, D = L.data();
   var listEl = document.getElementById("site-list");
   var detailEl = document.getElementById("detail");
+  var statusEl = document.getElementById("sr-status"); // kept across re-renders
   var map = null, markers = {};
 
-  function showError(msg) {
+  function showState(kind, head, msg) {
     detailEl.textContent = "";
-    detailEl.appendChild(L.el("div", { class: "state state--error", role: "alert" }, [
-      L.el("h1", { text: "The landfill data did not load" }),
-      L.el("p", { text: msg })
-    ]));
+    var attrs = { class: "state state--" + kind };
+    if (kind === "error") attrs.role = "alert";
+    detailEl.appendChild(L.el("div", attrs, [L.el("h1", { text: head }), L.el("p", { text: msg })]));
     listEl.textContent = "";
+    document.getElementById("map").hidden = true;
   }
 
   if (!D) {
-    showError("The file web/data/sites.js is missing or broken. From the project folder run: python pipeline/build_sites.py, then reload this page.");
+    showState("error", "The landfill data did not load", "The file web/data/sites.js is missing or broken. From the project folder run: python pipeline/build_sites.py, then reload this page.");
     return;
   }
   if (!D.sites.length) {
-    showError("The snapshot holds no waste-sector plumes for this area, so there is nothing to list. Run python pipeline/fetch_plumes.py with a wider --bbox, then python pipeline/build_sites.py.");
+    showState("empty", "No landfills to show yet", "The snapshot holds no waste-sector plumes for this area, so there is nothing to list. Run python pipeline/fetch_plumes.py with a wider --bbox, then python pipeline/build_sites.py.");
     return;
   }
 
   // ---------- rail: note, list, map ----------
   document.getElementById("rail-note").textContent =
     L.plural(D.waste_plumes, "waste-sector plume") + " seen from aircraft and satellites between " +
-    L.fmtDate(D.oldest_observation) + " and " + L.fmtDate(D.newest_observation) +
+    L.fmtDate(D.waste_oldest_observation || D.oldest_observation) + " and " + L.fmtDate(D.waste_newest_observation || D.newest_observation) +
     ", grouped into sites where detections fall within " + D.cluster_km + " km of each other.";
 
   listEl.textContent = "";
@@ -48,7 +49,7 @@
   function initMap() {
     var box = document.getElementById("map");
     if (!window.L || !window.L.map) { box.hidden = true; return; }
-    map = window.L.map(box, { scrollWheelZoom: false, attributionControl: true, zoomSnap: 0.25 });
+    map = window.L.map(box, { scrollWheelZoom: false, attributionControl: true, zoomSnap: 0.25, keyboard: false });
     window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
@@ -129,16 +130,21 @@
     if (site.name_source_url) {
       detailEl.appendChild(L.el("p", { class: "note" }, [
         "Name matched to the registered facility " + site.name_distance_km.toFixed(1) + " km from the site centre (",
-        L.el("a", { href: site.name_source_url, rel: "noopener", target: "_blank", text: "source record" }),
+        L.el("a", { href: site.name_source_url, rel: "noopener", target: "_blank" }, ["source record", L.el("span", { class: "visually-hidden", text: " (opens in a new tab)" })]),
         ")." + (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? " This is a closed landfill with a single detection; treat the match with care." : "")
       ]));
     } else {
       detailEl.appendChild(L.el("p", { class: "note", text: "No registered landfill was matched within 3 km of these detections." }));
     }
+    if (site.nearby_other_sector) {
+      detailEl.appendChild(L.el("p", { class: "note", text: L.plural(site.nearby_other_sector, "other plume") +
+        " within 1 km of these detections " + (site.nearby_other_sector === 1 ? "was" : "were") +
+        " classed by Carbon Mapper as a non-waste source and " + (site.nearby_other_sector === 1 ? "is" : "are") + " not counted here." }));
+    }
 
     // stats
     detailEl.appendChild(L.el("dl", { class: "stats" }, [
-      stat("Plumes detected", String(site.plume_count), null, L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
+      stat("Plumes detected", String(site.plume_count), null, site.first_date === site.last_date ? "on " + L.fmtDate(site.first_date) : L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
       stat("Median rate", site.median_rate_kg_h == null ? "n/a" : L.fmtRate(site.median_rate_kg_h), site.median_rate_kg_h == null ? null : "kg/h",
         "of " + L.plural(site.quantified_count, "plume") + " with a published rate"),
       stat("Largest rate", site.max_rate_kg_h == null ? "n/a" : L.fmtRate(site.max_rate_kg_h), site.max_rate_kg_h == null ? null : "kg/h",
@@ -154,8 +160,8 @@
       withheld ? L.el("li", {}, [L.el("span", { class: "key key--square", "aria-hidden": "true" }), "Detected, rate not published (" + withheld + ")"]) : null
     ]);
     detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
-      L.el("h2", { id: "timeline-title", text: "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4) }),
-      L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
+      L.el("h2", { id: "timeline-title", text: site.first_date.slice(0, 4) === site.last_date.slice(0, 4) ? "Every detection, " + site.first_date.slice(0, 4) : "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4) }),
+      L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site; dots from the same day are spread a few pixels apart. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
       legend, chartBox,
       L.el("details", { class: "more" }, [
         L.el("summary", { text: "All " + L.plural(site.plume_count, "detection") + " as a table" }),
@@ -186,9 +192,20 @@
   }
 
   function route(focus) {
-    var site = L.siteById(L.siteIdFromHash()) || D.sites[0];
+    var asked = L.siteIdFromHash();
+    var site = L.siteById(asked) || D.sites[0];
     renderSite(site);
-    if (focus) detailEl.focus({ preventScroll: false });
+    if (asked && asked !== site.id) {
+      history.replaceState(null, "", "#site=" + site.id);
+      detailEl.insertBefore(L.el("p", { class: "note", text: "No landfill matches “" + asked + "”, so the site with the most detections is shown." }), detailEl.children[1]);
+    }
+    if (statusEl) { detailEl.prepend(statusEl); statusEl.textContent = "Showing " + site.name; }
+    if (focus) {
+      var h1 = detailEl.querySelector("h1");
+      h1.setAttribute("tabindex", "-1");
+      h1.focus({ preventScroll: true });
+      detailEl.scrollIntoView({ block: "start" });
+    }
   }
 
   // ---------- about facts ----------

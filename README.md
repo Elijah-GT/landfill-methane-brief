@@ -6,13 +6,13 @@ A one-page methane brief for any Sacramento-area landfill, built from public air
 
 ## The problem, in two sentences
 
-From January 1, 2027, California landfill operators must investigate and fix methane plumes that CARB detects remotely and tells them about, with surveys due within 10 days of CARB's notice. But the plume history, each site's record and the new legal duties live in separate places, so a local solid-waste analyst cannot quickly see how often their landfill has leaked, how large the leaks were, or what the rule now asks of the operator.
+From January 1, 2027, California landfill operators must investigate and fix methane plumes that CARB detects remotely and tells them about, starting with a ground survey within 10 days of CARB's notice (30 days at uncontrolled landfills). But the plume history, each site's record and the new legal duties live in separate places, so a local solid-waste analyst cannot quickly see how often their landfill has leaked, how large the leaks were, or what the rule now asks of the operator.
 
 ## What it does
 
-1. **Pick a landfill.** The app groups 205 waste-sector methane plumes (2017 to Aug 2026) into 9 sites, names each from EPA and CalRecycle records, and shows them on a list and a map.
+1. **Pick a landfill.** The app groups 294 waste-sector methane plumes (Oct 2016 to Sep 2026) from the Sacramento Valley and Delta into 9 sites, names each from EPA and CalRecycle records, and shows them on a list and a map.
 2. **See its history.** Count, date range, median and largest emission rate with its published uncertainty, and a timeline with one dot per detection and an uncertainty bar. Detections whose rate was not published are shown, not dropped.
-3. **See what the 2027 rule asks after a CARB notice.** Twelve operator duties, each with its deadline, its section number linked to the page of the regulation, and the verbatim regulation text.
+3. **See what the 2027 rule asks after a CARB notice.** Eleven operator duties, plus the notice that triggers them, each with its deadline, its section number linked to the page of the regulation, and the verbatim regulation text.
 4. **Generate a brief.** A print-ready, one-page US Letter brief with data dates, the 30-day publication lag, caveats and credits. Print it or save it as a PDF.
 
 ## How it complements CARB's CalSMP dashboard
@@ -44,7 +44,7 @@ python pipeline/fetch_plumes.py      # Carbon Mapper API -> data/plumes_snapshot
 python pipeline/build_sites.py       # snapshot -> clusters, stats -> web/data/sites.js
 ```
 
-`fetch_plumes.py` takes `--bbox MINLON MINLAT MAXLON MAXLAT` for another area. The Carbon Mapper plume endpoint answers without a token today; if that changes, set `CARBONMAPPER_TOKEN` and it is sent as a Bearer token. New clusters need a name added to `pipeline/site_names.json` with a source link, or they show as "Unnamed waste site near …".
+`fetch_plumes.py` takes `--bbox MINLON MINLAT MAXLON MAXLAT` for another area; `build_sites.py` warns when a site's detections lie within 3 km of the box edge, where its record could be cut off. The Carbon Mapper plume endpoint answers without a token today; if that changes, set `CARBONMAPPER_TOKEN` and it is sent as a Bearer token. New clusters need a name added to `pipeline/site_names.json` with a source link, or they show as "Unnamed waste site near …".
 
 ### Tests
 
@@ -58,7 +58,7 @@ The tests cover distance, 1 km clustering, per-site statistics, the build step, 
 ## How it works
 
 ```
-Carbon Mapper API ──fetch_plumes.py──> data/plumes_snapshot.json  (230 CH4 plumes, image URLs dropped)
+Carbon Mapper API ──fetch_plumes.py──> data/plumes_snapshot.json  (346 CH4 plumes, image URLs dropped)
                                          │
                        build_sites.py ───┤ keep sector 6A (solid waste disposal on land)
                                          │ single-linkage clustering, 1 km
@@ -85,9 +85,11 @@ web/data/checklist.js (hand-built from the regulation) ─>  brief.html (one pri
 
 * **Not legal advice and not a compliance finding.** The tool reports detections and summarises what the rule requires. It never says a landfill is or is not meeting the rule.
 * **Only CARB's notification triggers the duties** (§ 95469(b)). A plume in the public data does not, by itself.
-* **About 30 days behind.** Carbon Mapper publishes plumes about 30 days after observation; the newest in this snapshot is from Aug 18, 2026. This is a history and accountability tool, not an alert system.
+* **About 30 days behind.** Carbon Mapper publishes plumes about 30 days after observation; the newest in this snapshot is from Sep 15, 2026. This is a history and accountability tool, not an alert system.
 * **Attribution is by distance.** A plume near a landfill may come from a neighbouring source. Each site shows how far its detections lie from its centre.
-* **Rates are estimates.** Each carries Carbon Mapper's published ± uncertainty. Carbon Mapper does not say whether that is one standard deviation or a 95% interval. 53 of 230 plumes in the region have no published rate.
+* **Rates are estimates.** Each carries Carbon Mapper's published ± uncertainty. Carbon Mapper does not say whether that is one standard deviation or a 95% interval. 71 of 346 plumes in the region have no published rate.
+* **Only waste-sector plumes count.** Plumes Carbon Mapper classed as another sector are left out even when they sit inside a site (7 near Kiefer, 1 near Recology Hay Road); each site says how many.
+* **Possible duplicates.** A few detections share a scene and position (for example two at Potrero Hills on Jun 17, 2017); they are counted as Carbon Mapper lists them.
 * **Coverage is uneven.** Aircraft and satellites saw each site only when they passed over, so a year with no dots is not a year without leaks.
 * **The user is assumed, not validated.** The tool is designed for a city or county analyst, but has not been tested with one.
 

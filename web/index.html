@@ -12,7 +12,7 @@
   <a class="skip" href="#detail">Skip to the selected landfill</a>
   <header class="bar">
     <div class="bar-inner">
-      <a class="wordmark" href="./" aria-label="Landfill methane brief, home">Landfill methane brief</a>
+      <a class="wordmark" href="index.html" aria-label="Landfill methane brief, home">Landfill methane brief</a>
       <nav aria-label="Site">
         <ul class="bar-links">
           <li><a href="#about">Data and limits</a></li>
@@ -24,17 +24,20 @@
 
   <main class="shell">
     <aside class="rail" aria-labelledby="rail-title">
-      <h2 id="rail-title" class="rail-title">Sacramento-area landfills</h2>
+      <div class="rail-inner">
+      <h2 id="rail-title" class="rail-title">Landfills in the Sacramento region</h2>
       <p class="rail-note" id="rail-note">Waste-sector methane plumes seen from aircraft and satellites, grouped into sites.</p>
-      <div id="map" class="map" aria-label="Map of the landfill sites; the list below has the same sites"></div>
+      <div id="map" class="map" role="region" aria-label="Map of the landfill sites; the list below has the same sites"></div>
       <ol id="site-list" class="site-list" aria-label="Landfills, most detections first">
         <li class="site-skeleton" aria-hidden="true"></li>
         <li class="site-skeleton" aria-hidden="true"></li>
         <li class="site-skeleton" aria-hidden="true"></li>
       </ol>
+      </div>
     </aside>
 
-    <section id="detail" class="detail" tabindex="-1" aria-live="polite">
+    <section id="detail" class="detail" tabindex="-1" aria-label="Selected landfill">
+      <p class="visually-hidden" role="status" id="sr-status"></p>
       <noscript><p class="state">This tool needs JavaScript to read its bundled data file. The data itself is in <code>web/data/sites.js</code>.</p></noscript>
       <div class="state state--loading" aria-hidden="true">
         <div class="skeleton skeleton--head"></div>

@@ -23,8 +23,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 API_URL = "https://api.carbonmapper.org/api/v1/catalog/plumes/annotated"
-# min lon, min lat, max lon, max lat: Sacramento valley from Suisun to Yuba City.
-DEFAULT_BBOX = (-122.2, 38.0, -120.9, 39.2)
+# min lon, min lat, max lon, max lat: Sacramento valley and delta, Pittsburg to Yuba City.
+# Keep every site well inside the box: a landfill on the edge loses detections (see NOTES.md).
+DEFAULT_BBOX = (-122.2, 37.9, -120.8, 39.2)
 PAGE_SIZE = 500
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = ROOT / "data" / "plumes_snapshot.json"
