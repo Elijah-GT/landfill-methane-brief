@@ -109,3 +109,22 @@ def test_fallback_names_and_out_of_state_sites():
     assert unnamed["id"] == "site-37-000-120-000"
     assert data["outside_california"] == [{"lat": 36.375, "lon": -114.865, "plume_count": 1}]
     assert data["waste_plumes"] == 2
+
+
+def test_outlying_cluster_of_same_landfill_is_labelled_near():
+    from pipeline.build_sites import build
+    def plume(pid, lat, lon):
+        return {"plume_id": pid, "scene_timestamp": "2024-01-01T00:00:00Z", "published_at": "2024-02-01T00:00:00Z",
+                "sector": "6A", "lat": lat, "lon": lon, "emission_auto": 100.0, "emission_uncertainty_auto": 30.0,
+                "platform": "GAO", "hide_emission": False}
+    # main group of two at the record; one detection 2 km north, also within 3 km of the record
+    snap = {"fetched_at": "2026-01-01T00:00:00Z",
+            "plumes": [plume("a", 38.0, -121.0), plume("b", 38.001, -121.0), plume("c", 38.018, -121.0)]}
+    names = [{"name": "BIG LANDFILL", "short_name": "Big Landfill", "lat": 38.0, "lon": -121.0}]
+    sites = build(snap, names)["sites"]
+    main, out = sites
+    assert main["name"] == "Big Landfill" and main["id"] == "big-landfill" and main["near_of"] is None
+    assert out["name"] == "Near Big Landfill"
+    assert out["near_of"] == {"id": "big-landfill", "name": "Big Landfill"}
+    assert out["id"] == "near-big-landfill-38-018-121-000"
+    assert len({s["id"] for s in sites}) == 2

@@ -87,6 +87,27 @@ def plume_row(p: dict, lat: float, lon: float) -> dict:
     }
 
 
+def mark_secondary_matches(sites: list[dict]) -> None:
+    """When several sites match the same landfill record (outlying detections more than
+    1 km from the main group), the site with the most detections keeps the name (ties go to
+    the one nearer the record). The others are labelled "Near <name>" and point to it."""
+    groups: dict[str, list[dict]] = {}
+    for s in sites:
+        if s["official_name"]:
+            groups.setdefault(s["official_name"], []).append(s)
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        primary = max(group, key=lambda s: (s["plume_count"], -s["name_distance_km"]))
+        primary["id"] = slugify(primary["name"])
+        for s in group:
+            if s is primary:
+                continue
+            s["near_of"] = {"id": primary["id"], "name": primary["name"]}
+            s["name"] = "Near " + primary["name"]
+            s["id"] = slugify(f"near {primary['name']} {s['lat']:.3f} {s['lon']:.3f}")
+
+
 def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None = None) -> dict:
     all_plumes = snapshot["plumes"]
     waste = [p for p in all_plumes if p.get("sector") == WASTE_SECTOR]
@@ -144,6 +165,7 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
             "name_distance_km": round(haversine_km(stats["lat"], stats["lon"], named["lat"], named["lon"]), 2)
             if named else None,
             "nearest_record": nearest,
+            "near_of": None,
             **stats,
             "max_km_from_center": max(r["km_from_center"] for r in rows),
             "nearby_other_sector": nearby_other,
@@ -151,6 +173,7 @@ def build(snapshot: dict, names: list[dict], fallback_names: list[dict] | None =
             "plumes": rows,
         })
 
+    mark_secondary_matches(sites)
     observed = sorted(p["scene_timestamp"] for p in all_plumes)
     kept = {r["plume_id"] for s in sites for r in s["plumes"]}
     waste_ca = [p for p in waste if p["plume_id"] in kept]

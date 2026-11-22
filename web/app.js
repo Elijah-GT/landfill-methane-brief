@@ -59,6 +59,7 @@
         li.hidden = !hit;
         if (hit) shown++;
       });
+      if (shown) listEl.removeAttribute("data-empty"); else listEl.setAttribute("data-empty", "");
       count.textContent = q ? (shown ? "Showing " + shown + " of " + D.sites.length + " sites" : "No site matches “" + input.value.trim() + "”")
         : D.sites.length + " sites, most detections first";
     }
@@ -176,7 +177,13 @@
       ])
     ]);
     detailEl.appendChild(head);
-    if (site.name_source_url) {
+    if (site.near_of) {
+      detailEl.appendChild(L.el("p", { class: "note" }, [
+        "These detections lie more than 1 km from the main group at ",
+        L.el("a", { href: "#site=" + site.near_of.id, text: site.near_of.name }),
+        ", so they are counted as a separate site. They may come from the same landfill or from a neighbouring source."
+      ]));
+    } else if (site.name_source_url) {
       detailEl.appendChild(L.el("p", { class: "note" }, [
         "Name matched to the registered facility " + site.name_distance_km.toFixed(1) + " km from the site centre (",
         L.el("a", { href: site.name_source_url, rel: "noopener", target: "_blank" }, ["source record", L.el("span", { class: "visually-hidden", text: " (opens in a new tab)" })]),
