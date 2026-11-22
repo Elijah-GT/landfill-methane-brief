@@ -38,6 +38,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Tag file links with the commit so browsers fetch new code after each deploy
+        run: |
+          V="${GITHUB_SHA::7}"
+          sed -i -E "s/((src|href)=\"[^\":]+\.(js|css))\"/\1?v=$V\"/g" web/*.html
+          sed -i -E "s/(@import url\(\"[^\"]+\.css)\"/\1?v=$V\"/g" web/*.css
+          grep -c "?v=$V" web/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
