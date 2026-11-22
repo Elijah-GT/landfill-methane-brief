@@ -5,9 +5,53 @@ Status, decisions and what was or was not verified. All times PST, Sun Nov 22, 2
 ## Status
 
 * **Core build complete** (data pipeline, app, cited checklist, one-page brief), well ahead of the 9:00 AM freeze.
-* Tests: 29 passing (`python -m pytest pipeline/tests -q`).
-* Brief: prints on exactly one US Letter page for all 9 sites (checked by printing each to PDF with headless Chrome and counting pages).
+* Tests: 51 passing (`python -m pytest pipeline/tests -q`; the notice and spot tests need Node).
+* Brief: prints on exactly one US Letter page for all 53 sites, with and without a notice, in both ranges (265 variants, checked by printing each to PDF with headless Chrome and counting pages).
 * Deployed to GitHub Pages from `web/` by `.github/workflows/pages.yml`.
+
+## Statewide branch (`statewide`, started 08:37, after the 9:00 freeze was near)
+
+Not merged into `main`; the submitted site stays the Sacramento-region version until this is reviewed.
+
+* Snapshot: 5,493 CH4 plumes in the box −124.5 to −114.1 longitude, 32.5 to 42.1 latitude (fetched Nov 22, 2026, 08:38). Sectors: 2,726 in 6A, 1,583 in 1B2, 998 in 4B, 112 in 1A1, 74 other or blank.
+* One waste cluster (19 plumes at 36.38 N, 114.87 W) lies in Nevada and is dropped by the border test in `pipeline/sites.py`: the 120th meridian north of 39° N, then the straight line from 39° N 120° W to the Colorado River at about 35.0019 N, 114.6333 W. The Arizona and Mexico borders are not modelled; the build prints a note for any unnamed site near them. None appeared. That leaves 2,707 waste-sector plumes in 57 one-kilometre groups.
+* Names: 124 California landfill records from EPA GHGRP (subparts HH and TT; reporting years 2011, 2014, 2017, 2020, 2023, each facility's latest kept). 45 of the 57 groups match one within 3 km (9 from the hand-checked list). **The 32 new names were matched by distance only and not checked one by one.**
+* Groups that match the same record are folded into one site (user decision): 4 outlying groups, 7 detections, at Sunshine Canyon (2 single detections, 1.2 and 2.7 km from the main group), Prima Deshecha (4, 1.1 km) and Guadalupe (1, 1.4 km). Result: 53 sites, 41 named, 12 unnamed. Each merged site discloses the outlying count and its furthest detection. Prima Deshecha's largest rate (1,885 kg/h, EMIT) comes from its outlying group.
+* 12 sites have no record within 3 km. For several large ones the nearest EPA record is plainly the same landfill with an office or gate address (Altamont 4.7 km, Monterey Regional 3.2 km, Simi Valley 6.5 km, Johnson Canyon 3.1 km), but the app does not name them; it shows the nearest record and distance. A checked entry in `site_names.json` would name them.
+* All 53 briefs were printed to PDF with headless Chrome: each is exactly one US Letter page.
+* Unnamed sites now get IDs from their coordinates (`site-37-755-121-647`), so links survive a refresh.
+
+## Brief redesign (statewide branch)
+
+* Question asked: what is the printed page for? Two readers: a manager who needs the picture quickly, and the operator across the table, who needs specifics they can check. The general duty summary was removed from the brief (it stays in the app); the caveat bullets became four labelled notes.
+* Layout: header, four key figures, the follow-up table when a notice is entered, the chart, the most recent detections (date, rate ± uncertainty, instrument, plume coordinates, distance from centre), next steps when there is no notice, notes, sources.
+* Second pass (user feedback: the "Next steps" and "Notes on the data" sections made the tool look like it could not tell you much): both removed. The limits of the data now sit in one footer line. In their place, **Where detections repeat**: the period's detections grouped greedily (the detection with the most others within 200 m becomes a spot; repeat), listed only when a spot has detections on two or more different days, so one flyover is not read as recurrence. Top three spots (two on a follow-up page) with count, days, first and last date, largest rate and a question for the operator. Examples in the last 24 months: Sunshine Canyon 17 of 32 detections on 7 days at one spot; Newby Island 13 of 17; Kiefer 7 of 15. Locations are Carbon Mapper's estimated plume origins, not ground truth.
+* Fitting to one page, in order: tighter spacing, fewer detection rows (to 5), a shorter chart (never under 130 px), fewer rows (to 3), smaller type, and as a last resort the detection table becomes one line; then chart height and rows are given back while they fit, and normal-size type is preferred over extra rows. Short charts use fewer y-axis labels so they never collide.
+
+## After-notice follow-up (statewide branch)
+
+* Job: once CARB has notified an operator, show the analyst what is due when and what to ask. Enter the receipt date, landfill type (controlled, uncontrolled, not sure) and optional CARB ID; the state lives in the URL (`&notice=YYYY-MM-DD&type=…&carb=…`) and carries into the brief.
+* Dated steps, checked against the clean copy: survey within 10 calendar days of receiving the notice (§ 95469(b)(2)(A), p. 27) and report within 15 (§ 95470(b)(7)(A), p. 48) for controlled landfills; survey within 30 (§ 95469(b)(3)(A), p. 28) and report within 35 (§ 95470(b)(7)(C), p. 49) for uncontrolled ones. Repair steps (5 and 10 days from a reading or leak; 5 days after a successful re-test) depend on facts the analyst will not have, so they appear as rules plus questions, not dates.
+* **Not in the regulation:** how to count days. The text never says whether the receipt day counts or whether a weekend or holiday moves a due date. The app uses receipt date + N and says so on screen and on the brief. California's general rules for computing time (Code of Civil Procedure §§ 10–12a) were not checked for whether they apply here.
+* Logic in `web/notice.js` (no DOM), tested through Node by `pipeline/tests/test_notice.py` (month ends, leap years, the "not sure" set, neutral wording for passed dates, hash parsing and bad input). The questions are written for this tool; each step cites a checklist item.
+* Dates before Jan 1, 2027 and future dates show a warning; nothing is stored anywhere but the URL.
+
+### Independent evaluation of the follow-up (fixed)
+
+* Crashes: a malformed `%` in the address (`carb=50%`) and inherited names as the type (`type=toString`) broke the page. Decoding is now guarded and types are checked as own properties; both have tests.
+* 200 ppmv: at uncontrolled landfills the 35-day report covers exceedances of the § 95463(b)(2)(B) value, 200 ppmv (p. 3), and any reading of 200 ppmv or more brings the landfill under §§ 95464–95476 (§ 95463(b)(2)(B)1., p. 4; quote checked verbatim), including a gas collection design plan within a year (§ 95464(a)(1), p. 5). Added as a cited conditional step and checklist item; "high reading" replaced.
+* The 15-day report applies "at a controlled MSW landfill" (§ 95470(b)(7)(A)); the app now says so, since its "controlled" option also covers landfills with a gas control system. The 500 ppmv step now includes the one-month re-test and the second and third exceedance path.
+* Accessibility: the due-date table is no longer a live region rebuilt on every keystroke; one short status sentence is announced when the date or type changes.
+* State: the chosen type and CARB ID survive a range switch while the date is blank; a corrected site id keeps the notice; a year typed digit by digit (0202) is no longer taken as a date (2020–2099 only).
+* Brief: future-date note added; the CARB ID moved to its own line, with a last fitting step, after a 40-character ID pushed one brief to two pages.
+* Not adopted (judgement calls, open): softening "Can you share a copy?", taller answer boxes, and a one-line pointer to online filing and certification on the follow-up brief.
+
+## Recent window (statewide branch)
+
+* The app and brief open on the 24 months before the fetch date (`recent_since` = 2024-11-22 for this snapshot; `build_sites.recent_since`, tested including Feb 29). Each site carries `recent` statistics computed by the same `site_stats` as the full record; the site's location stays the full-record centre.
+* Why: the full record is shaped by flight campaigns (2024 alone is 1,516 of 2,707 detections, mostly April and June aircraft flights), and instruments differ in what they can see (median detected rate 244 kg/h for AVIRIS-NG, 545 for Tanager-1, 1,423 for EMIT). Recent detections are 207 satellite and 42 aircraft.
+* In the window: 249 detections at 35 of 53 sites. The other 18 are listed below them as "None since Nov 22, 2024" with hollow map markers, and their page and brief say no plume was published, not that nothing leaked; the brief then shows the full history.
+* The full history is one click away (`#site=<id>&range=all`), and the choice carries into the brief.
 
 ## Verified (first-hour gate)
 

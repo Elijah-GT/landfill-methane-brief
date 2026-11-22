@@ -65,6 +65,30 @@
     return m ? m[1] : null;
   }
 
+  // Time range: the last 24 months (default) or the full record. Kept in the hash as &range=all.
+  function rangeFromHash() {
+    return /(?:^|[#&])range=all(?:&|$)/.test(window.location.hash) ? "all" : "recent";
+  }
+  function hashFor(siteId, range) {
+    return "#site=" + siteId + (range === "all" ? "&range=all" : "");
+  }
+  // The site as seen in a range: in "recent", its statistics and detections are limited to the
+  // window (data.recent_since onward); everything else (name, location, notes) is unchanged.
+  var EMPTY = { plume_count: 0, quantified_count: 0, first_date: null, last_date: null, median_rate_kg_h: null,
+    max_rate_kg_h: null, max_rate_uncertainty_kg_h: null, max_rate_date: null, per_year: {}, platforms: [] };
+  function view(site, range) {
+    if (range === "all") return Object.assign({}, site, { range: "all", full: site });
+    var since = data().recent_since;
+    return Object.assign({}, site, site.recent || EMPTY, {
+      range: "recent", full: site,
+      plumes: site.plumes.filter(function (p) { return p.date >= since; })
+    });
+  }
+  function windowLabel() {
+    var d = data();
+    return "the last " + d.recent_months + " months";
+  }
+
   function kindCounts(site) {
     var c = { space: 0, aircraft: 0, unknown: 0 };
     site.plumes.forEach(function (p) { c[platform(p.platform).kind]++; });
@@ -95,6 +119,7 @@
   window.LMB = {
     LINKS: LINKS, platform: platform, fmtDate: fmtDate, fmtRate: fmtRate, fmtRateUnc: fmtRateUnc,
     round2sf: round2sf, data: data, siteById: siteById, siteIdFromHash: siteIdFromHash,
+    rangeFromHash: rangeFromHash, hashFor: hashFor, view: view, windowLabel: windowLabel,
     kindCounts: kindCounts, plural: plural, el: el, regPageUrl: regPageUrl, numFmt: numFmt
   };
 })();

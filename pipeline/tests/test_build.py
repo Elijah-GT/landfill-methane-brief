@@ -43,7 +43,7 @@ def test_named_site_first_and_unnamed_fallback():
     assert top["quantified_count"] == 2
     assert top["max_rate_kg_h"] == 300
     assert other["name"].startswith("Unnamed waste site near")
-    assert other["id"] == "site-2"
+    assert other["id"] == "site-38-900-121-900"  # from its coordinates, so links survive a data refresh
 
 
 def test_plume_rows_flag_withheld_rates_and_sorted_by_date():
@@ -88,3 +88,78 @@ def test_edge_site_warns(capsys):
     snap = dict(SNAP, bbox=[-121.3, 38.499, -121.1, 38.6])
     build(snap, NAMES)
     assert "fetch box edge" in capsys.readouterr().err
+
+
+def test_fallback_names_and_out_of_state_sites():
+    from pipeline.build_sites import build
+    def plume(pid, lat, lon):
+        return {"plume_id": pid, "scene_timestamp": "2024-01-01T00:00:00Z", "published_at": "2024-02-01T00:00:00Z",
+                "sector": "6A", "lat": lat, "lon": lon, "emission_auto": 100.0, "emission_uncertainty_auto": 30.0,
+                "platform": "GAO", "hide_emission": False}
+    snap = {"fetched_at": "2026-01-01T00:00:00Z", "plumes": [
+        plume("a", 38.0, -121.0), plume("b", 37.0, -120.0), plume("nv", 36.375, -114.865)]}
+    curated = [{"name": "A", "short_name": "Curated A", "lat": 38.001, "lon": -121.0}]
+    epa = [{"name": "A EPA", "short_name": "EPA A", "lat": 38.0, "lon": -121.0},
+           {"name": "B", "short_name": "EPA B", "lat": 37.05, "lon": -120.0, "source_url": "u"}]
+    data = build(snap, curated, epa)
+    names = [s["name"] for s in data["sites"]]
+    assert "Curated A" in names and "EPA A" not in names          # hand-checked names win
+    unnamed = [s for s in data["sites"] if s["official_name"] is None][0]
+    assert unnamed["nearest_record"]["name"] == "EPA B"            # 5.6 km away: shown, not used as the name
+    assert unnamed["id"] == "site-37-000-120-000"
+    assert data["outside_california"] == [{"lat": 36.375, "lon": -114.865, "plume_count": 1}]
+    assert data["waste_plumes"] == 2
+
+
+def test_outlying_groups_matching_one_landfill_are_folded_in():
+    from pipeline.build_sites import build
+    def plume(pid, lat, lon):
+        return {"plume_id": pid, "scene_timestamp": "2024-01-01T00:00:00Z", "published_at": "2024-02-01T00:00:00Z",
+                "sector": "6A", "lat": lat, "lon": lon, "emission_auto": 100.0, "emission_uncertainty_auto": 30.0,
+                "platform": "GAO", "hide_emission": False}
+    # main group of two at the record; one detection 2 km north, also within 3 km of the record;
+    # one more 20 km away that matches nothing
+    snap = {"fetched_at": "2026-01-01T00:00:00Z",
+            "plumes": [plume("a", 38.0, -121.0), plume("b", 38.001, -121.0), plume("c", 38.018, -121.0),
+                       plume("far", 38.2, -121.0)]}
+    names = [{"name": "BIG LANDFILL", "short_name": "Big Landfill", "lat": 38.0, "lon": -121.0}]
+    sites = build(snap, names)["sites"]
+    assert [s["name"] for s in sites][0] == "Big Landfill"
+    big = sites[0]
+    assert big["plume_count"] == 3 and big["id"] == "big-landfill"
+    assert big["outlying_groups"] == 1 and big["outlying_detections"] == 1
+    assert len(sites) == 2 and sites[1]["official_name"] is None and sites[1]["outlying_groups"] == 0
+
+
+def test_recent_window_since_date():
+    from pipeline.build_sites import recent_since
+    assert recent_since("2026-11-22T16:38:42+00:00") == "2024-11-22"
+    assert recent_since("2026-02-28T00:00:00Z", 24) == "2024-02-28"
+    assert recent_since("2028-02-29T00:00:00Z", 12) == "2027-02-28"
+    assert recent_since("2026-01-15T00:00:00Z", 1) == "2025-12-15"
+
+
+def test_recent_window_stats_per_site():
+    from pipeline.build_sites import build
+    def plume(pid, day, rate):
+        return {"plume_id": pid, "scene_timestamp": day + "T18:00:00Z", "published_at": day + "T18:00:00Z",
+                "sector": "6A", "lat": 38.0, "lon": -121.0, "emission_auto": rate, "emission_uncertainty_auto": 10.0,
+                "platform": "GAO", "hide_emission": False}
+    snap = {"fetched_at": "2026-11-22T00:00:00Z", "plumes": [
+        plume("old", "2017-06-01", 900.0), plume("edge", "2024-11-22", 100.0), plume("new", "2026-01-01", 300.0)]}
+    data = build(snap, [])
+    assert data["recent_since"] == "2024-11-22" and data["recent_months"] == 24
+    site = data["sites"][0]
+    assert site["plume_count"] == 3 and site["max_rate_kg_h"] == 900.0
+    r = site["recent"]
+    assert r["plume_count"] == 2 and r["first_date"] == "2024-11-22" and r["max_rate_kg_h"] == 300.0
+    assert "lat" not in r
+
+
+def test_recent_window_empty_is_none():
+    from pipeline.build_sites import build
+    snap = {"fetched_at": "2026-11-22T00:00:00Z", "plumes": [
+        {"plume_id": "x", "scene_timestamp": "2017-06-01T00:00:00Z", "published_at": "2017-07-01T00:00:00Z",
+         "sector": "6A", "lat": 38.0, "lon": -121.0, "emission_auto": 50.0, "emission_uncertainty_auto": 5.0,
+         "platform": "AVIRIS-NG", "hide_emission": False}]}
+    assert build(snap, [])["sites"][0]["recent"] is None

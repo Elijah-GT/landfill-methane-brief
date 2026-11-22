@@ -4,6 +4,7 @@
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: H, the checklist is long; deadlines set as the row's lead figure so a reader scans the left edge only */
 /* waive 64: mono is the theme's material (Wayfind sets every glyph in Chivo Mono) */
 /* waive 56: .table th sticks inside its own scrolling .table-wrap, a different scroll container from the sticky rail */
+/* answered F4: .range-btn[aria-pressed="true"] is a selected state using the same ink fill as the selected list row, not a second primary-button recipe (primary stays accent) */
 /* finish-review: subagent · 8 findings · 6 resolved (row flash, empty rail, brief type, same-day dots, axis ticks, empty state) · 2 not adopted (checklist hierarchy, plate width: subjective) */
 /* waive 48, 24b, 62, 40 in vendor/leaflet/leaflet.css: Leaflet's own stylesheet, shipped unmodified; the controls this page shows are restyled with tokens below */
 @import url("./tokens.css");
@@ -43,6 +44,19 @@ h3 { font-size: var(--text-md); }
 .rail-title { font-size: var(--text-lg); }
 .rail-note { color: var(--color-ink-2); font-size: var(--text-sm); }
 
+/* Time range: two buttons, the pressed one filled. */
+.range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: var(--rule-bar) solid var(--color-ink); }
+.range-btn { min-height: 44px; padding: var(--space-xs) var(--space-sm); border: 0; background: var(--color-paper-3); color: var(--color-ink); font: 800 var(--text-sm)/1.2 var(--font-body); cursor: pointer; transition: background-color var(--dur-micro) steps(1), color var(--dur-micro) steps(1); }
+.range-btn + .range-btn { border-left: var(--rule-bar) solid var(--color-ink); }
+.range-btn:hover { background: var(--color-paper-2); }
+.range-btn:active { background: var(--color-rule); }
+.range-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; position: relative; }
+.range-btn[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper); }
+.range-note { font-size: var(--text-sm); color: var(--color-ink-2); max-width: 80ch; padding: var(--space-sm) var(--space-md); border-left: var(--rule-bar) solid var(--color-accent); background: var(--color-paper-3); }
+.range-note a { color: var(--color-ink); font-weight: 800; }
+.site--quiet .site-figure, .site--quiet .site-unit { color: var(--color-muted); }
+.map .site-marker.is-quiet { fill-opacity: 0; stroke: var(--color-muted); }
+.map .site-marker.is-quiet.is-current { fill: var(--color-accent-2); fill-opacity: 1; stroke: var(--color-ink); }
 .map-wrap { display: grid; gap: var(--space-xs); min-width: 0; }
 .map-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 .map-title { font-size: var(--text-sm); font-weight: 500; color: var(--color-ink-2); line-height: 1.4; }
@@ -63,8 +77,39 @@ h3 { font-size: var(--text-md); }
 .map .leaflet-control-attribution a { color: var(--color-ink); }
 .leaflet-tooltip { font: 500 var(--text-xs)/1.4 var(--font-body); border-radius: 0; border: var(--rule-bar) solid var(--color-ink); box-shadow: none; background: var(--color-paper-3); color: var(--color-ink); }
 
-.site-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.site-list li + li .site { border-top-width: 0; }
+.filter { display: grid; gap: var(--space-2xs); }
+.filter-label { font-size: var(--text-sm); font-weight: 500; }
+.filter-input { min-height: 44px; padding: 0 var(--space-sm); border: var(--rule-bar) solid var(--color-ink); border-radius: 0; background: var(--color-paper-3); color: var(--color-ink); font: 500 var(--text-md)/1.2 var(--font-body); }
+.filter-input:hover { background: var(--color-paper); }
+.filter-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.filter-count { font-size: var(--text-sm); color: var(--color-muted); }
+.site-list li[hidden] { display: none; }
+
+/* ---------- after a CARB notice ---------- */
+.notice-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-md) var(--space-lg); align-items: start; padding: var(--space-md); border: var(--rule-bar) solid var(--color-ink); background: var(--color-paper-3); }
+.field { display: grid; gap: var(--space-2xs); margin: 0; padding: 0; border: 0; min-width: 0; }
+.field--end { align-self: end; justify-items: start; }
+.field-label { font-size: var(--text-sm); font-weight: 800; padding: 0; }
+.field-hint { font-size: var(--text-xs); color: var(--color-muted); }
+.field-input { min-height: 44px; padding: 0 var(--space-sm); border: var(--rule-bar) solid var(--color-ink); border-radius: 0; background: var(--color-paper); color: var(--color-ink); font: 500 var(--text-md)/1.2 var(--font-body); width: 100%; }
+.field-input:hover { background: var(--color-paper-2); }
+.field-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.choice { display: flex; gap: var(--space-xs); align-items: baseline; font-size: var(--text-sm); cursor: pointer; }
+.choice input { accent-color: var(--color-ink); }
+.choice input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.notice-out { display: grid; gap: var(--space-sm); }
+.notice-table td { padding-right: var(--space-md); }
+.due-date { display: block; font-weight: 800; white-space: nowrap; }
+.due-standing { display: block; font-size: var(--text-xs); color: var(--color-muted); }
+.due--today .due-standing, .due--passed .due-standing { color: var(--color-ink); font-weight: 800; }
+.due-type { font-weight: 800; }
+.notice-sub { font-size: var(--text-md); }
+.notice-cond { margin: 0; padding-left: var(--space-md); display: grid; gap: var(--space-xs); max-width: 80ch; }
+.notice-ask { color: var(--color-ink-2); font-size: var(--text-sm); }
+/* The list draws the top rule, so the first visible row has one even when the filter hides rows above it. */
+.site-list { list-style: none; margin: 0; padding: 0; display: grid; align-content: start; border-top: var(--rule-bar) solid var(--color-ink); }
+.site-list[data-empty] { border-top: 0; }
+.site-list .site { border-top-width: 0; }
 .site { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-sm); row-gap: var(--space-3xs); padding: var(--space-sm) var(--space-md); border: var(--rule-bar) solid var(--color-ink); text-decoration: none; background: var(--color-paper-3); transition: background-color var(--dur-micro) steps(1, jump-start), color var(--dur-micro) steps(1, jump-start); }
 .site:hover { background: var(--color-paper-2); }
 .site:active { background: var(--color-rule); }

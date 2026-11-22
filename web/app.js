@@ -26,25 +26,90 @@
     return;
   }
 
-  // ---------- rail: note, list, map ----------
-  document.getElementById("rail-note").textContent =
-    L.plural(D.waste_plumes, "waste-sector plume") + " seen from aircraft and satellites between " +
-    L.fmtDate(D.waste_oldest_observation || D.oldest_observation) + " and " + L.fmtDate(D.waste_newest_observation || D.newest_observation) +
-    ", grouped into sites where detections fall within " + D.cluster_km + " km of each other.";
+  // ---------- rail: range, note, list, map ----------
+  var range = D.recent_since ? L.rangeFromHash() : "all";
+  var currentSite = null;
+  var applyFilter = null;
+  var keepFocus = false;
+  var rangeEl = document.getElementById("range");
+  if (D.recent_since) {
+    rangeEl.hidden = false;
+    rangeEl.querySelector('[data-range="recent"]').textContent = "Last " + D.recent_months + " months";
+    rangeEl.querySelector('[data-range="all"]').textContent = "Full history, since " + (D.waste_oldest_observation || "").slice(0, 4);
+    Array.prototype.forEach.call(rangeEl.querySelectorAll(".range-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var id = (currentSite && currentSite.id) || D.sites[0].id;
+        keepFocus = true; // switching range keeps focus on the switch, unlike picking a site
+        var N = window.LMBNotice, keep = N ? N.formToHash(N.formFromHash(window.location.hash)) : "";
+        window.location.hash = (L.hashFor(id, btn.getAttribute("data-range")) + keep).slice(1);
+      });
+    });
+  }
 
-  listEl.textContent = "";
-  D.sites.forEach(function (s) {
-    var btn = L.el("a", { class: "site", href: "#site=" + s.id, "data-site": s.id }, [
-      L.el("span", { class: "site-name", text: s.name }),
-      L.el("span", { class: "site-sub", text: (s.county || "County not matched") }),
-      L.el("span", { class: "site-count" }, [
-        L.el("span", { class: "site-figure", text: String(s.plume_count) }),
-        L.el("span", { class: "site-unit", text: s.plume_count === 1 ? " plume" : " plumes" })
-      ]),
-      L.el("span", { class: "site-sub site-last", text: "Last seen " + L.fmtDate(s.last_date) })
-    ]);
-    listEl.appendChild(L.el("li", {}, [btn]));
-  });
+  function countIn(s, r) { return r === "all" ? s.plume_count : (s.recent ? s.recent.plume_count : 0); }
+
+  function renderRail() {
+    Array.prototype.forEach.call(rangeEl.querySelectorAll(".range-btn"), function (btn) {
+      btn.setAttribute("aria-pressed", String(btn.getAttribute("data-range") === range));
+    });
+    var note = document.getElementById("rail-note");
+    if (range === "all") {
+      note.textContent = L.plural(D.waste_plumes, "waste-sector plume") + " seen from aircraft and satellites between " +
+        L.fmtDate(D.waste_oldest_observation || D.oldest_observation) + " and " + L.fmtDate(D.waste_newest_observation || D.newest_observation) +
+        ", grouped into sites where detections fall within " + D.cluster_km + " km of each other. Totals follow how often aircraft and satellites flew over, not only how often a site leaked.";
+    } else {
+      var n = D.sites.reduce(function (t, s) { return t + countIn(s, "recent"); }, 0);
+      var active = D.sites.filter(function (s) { return s.recent; }).length;
+      var k = { space: 0, aircraft: 0, unknown: 0 };
+      D.sites.forEach(function (s) { var c = L.kindCounts(L.view(s, "recent")); k.space += c.space; k.aircraft += c.aircraft; });
+      note.textContent = L.plural(n, "waste-sector plume") + " seen at " + active + " of " + D.sites.length +
+        " sites in " + L.windowLabel() + " (since " + L.fmtDate(D.recent_since) + "): " + k.space + " by satellite, " + k.aircraft +
+        " from aircraft. Sites are grouped where detections fall within " + D.cluster_km + " km of each other.";
+    }
+
+    var order = D.sites.slice().sort(function (a, b) {
+      return countIn(b, range) - countIn(a, range) || b.plume_count - a.plume_count;
+    });
+    listEl.textContent = "";
+    listEl.setAttribute("aria-label", range === "all" ? "Landfills, most detections first" : "Landfills, most detections in " + L.windowLabel() + " first");
+    order.forEach(function (s) {
+      var n = countIn(s, range);
+      var btn = L.el("a", { class: "site" + (n ? "" : " site--quiet"), href: L.hashFor(s.id, range), "data-site": s.id }, [
+        L.el("span", { class: "site-name", text: s.name }),
+        L.el("span", { class: "site-sub", text: s.county || (s.nearest_record ? "Unmatched; " + s.nearest_record.distance_km + " km from " + s.nearest_record.name : "No registered landfill within 10 km") }),
+        L.el("span", { class: "site-count" }, [
+          L.el("span", { class: "site-figure", text: String(n) }),
+          L.el("span", { class: "site-unit", text: n === 1 ? " plume" : " plumes" })
+        ]),
+        L.el("span", { class: "site-sub site-last", text: n || range === "all" ? "Last seen " + L.fmtDate(s.last_date) : "None since " + L.fmtDate(D.recent_since) + "; last seen " + L.fmtDate(s.last_date) })
+      ]);
+      var hay = [s.name, s.official_name, s.county, s.operator, s.nearest_record && s.nearest_record.name].filter(Boolean).join(" ").toLowerCase();
+      listEl.appendChild(L.el("li", { "data-search": hay }, [btn]));
+    });
+    if (applyFilter) applyFilter();
+    restyleMarkers();
+    if (currentSite) markCurrent(currentSite.id);
+  }
+
+  // Filter the list as you type. The map keeps every site; the list is the control.
+  (function initFilter() {
+    var box = document.getElementById("filter"), input = document.getElementById("site-filter"), count = document.getElementById("filter-count");
+    if (D.sites.length < 12) return;
+    box.hidden = false;
+    function apply() {
+      var q = input.value.trim().toLowerCase(), shown = 0;
+      Array.prototype.forEach.call(listEl.children, function (li) {
+        var hit = !q || li.getAttribute("data-search").indexOf(q) >= 0;
+        li.hidden = !hit;
+        if (hit) shown++;
+      });
+      if (shown) listEl.removeAttribute("data-empty"); else listEl.setAttribute("data-empty", "");
+      count.textContent = q ? (shown ? "Showing " + shown + " of " + D.sites.length + " sites" : "No site matches “" + input.value.trim() + "”")
+        : D.sites.length + " sites, most detections " + (range === "all" ? "first" : "in " + L.windowLabel() + " first");
+    }
+    input.addEventListener("input", apply);
+    applyFilter = apply;
+  })();
 
   function initMap() {
     var box = document.getElementById("map");
@@ -55,16 +120,38 @@
     }).addTo(map);
     var bounds = [];
     D.sites.forEach(function (s) {
-      var r = 5 + Math.sqrt(s.plume_count) * 2;
-      var mk = window.L.circleMarker([s.lat, s.lon], { radius: r, className: "site-marker", weight: 2 });
-      mk.bindTooltip(s.name + ": " + L.plural(s.plume_count, "plume"));
-      mk.on("click", function () { window.location.hash = "site=" + s.id; });
+      var mk = window.L.circleMarker([s.lat, s.lon], { radius: 6, className: "site-marker", weight: 2 });
+      mk.on("click", function () { window.location.hash = L.hashFor(s.id, range).slice(1); });
       mk.addTo(map);
       markers[s.id] = mk;
       bounds.push([s.lat, s.lon]);
     });
     map.fitBounds(bounds, { padding: [24, 24] });
     initMapToggle(bounds);
+  }
+
+  // Marker size follows the detections in the chosen range; sites with none in it are drawn hollow.
+  function restyleMarkers() {
+    D.sites.forEach(function (s) {
+      var mk = markers[s.id];
+      if (!mk) return;
+      var n = countIn(s, range);
+      mk.setRadius(n ? Math.min(22, 4 + Math.sqrt(n) * 1.3) : 4);
+      mk.unbindTooltip();
+      mk.bindTooltip(s.name + ": " + L.plural(n, "plume") + (range === "all" ? "" : " in " + L.windowLabel()));
+      var path = mk.getElement && mk.getElement();
+      if (path) path.classList.toggle("is-quiet", !n);
+    });
+  }
+  function markCurrent(id) {
+    Array.prototype.forEach.call(listEl.querySelectorAll(".site"), function (a) {
+      if (a.getAttribute("data-site") === id) a.setAttribute("aria-current", "true");
+      else a.removeAttribute("aria-current");
+    });
+    Object.keys(markers).forEach(function (mid) {
+      var path = markers[mid].getElement && markers[mid].getElement();
+      if (path) path.classList.toggle("is-current", mid === id);
+    });
   }
 
   // Expand the map to fill the window. The rest of the page is made inert while it is open,
@@ -134,7 +221,157 @@
     ]);
   }
 
-  function renderSite(site) {
+  function rangeNote(v) {
+    var full = v.full, other = L.hashFor(full.id, v.range === "all" ? "recent" : "all");
+    if (v.range === "all") {
+      return L.el("p", { class: "range-note" }, [
+        "Showing the full record: " + L.plural(full.plume_count, "detection") + " since " + L.fmtDate(full.first_date) + ". ",
+        D.recent_since ? L.el("a", { href: other, text: "Show " + L.windowLabel() + " only" }) : null
+      ]);
+    }
+    var earlier = full.plume_count - v.plume_count;
+    return L.el("p", { class: "range-note" }, [
+      "Showing " + L.windowLabel() + ", since " + L.fmtDate(D.recent_since) + ": " + L.plural(v.plume_count, "detection") + " of " + full.plume_count + ". " +
+        (earlier ? L.plural(earlier, "earlier detection") + " since " + L.fmtDate(full.first_date) + " " + (earlier === 1 ? "is" : "are") + " in the full history. " : ""),
+      earlier ? L.el("a", { href: other, text: "Show the full history" }) : null
+    ]);
+  }
+
+  // ---------- after a CARB notice ----------
+  function localToday() {
+    var now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+  }
+  function checklistItem(id) {
+    var C = window.LMB_CHECKLIST, hit = null;
+    (C ? C.groups : []).forEach(function (g) { g.items.forEach(function (it) { if (it.id === id) hit = it; }); });
+    return hit;
+  }
+  function citeLink(id) {
+    var it = checklistItem(id);
+    return it ? L.el("a", { class: "cite", href: L.regPageUrl(it.page), rel: "noopener", target: "_blank" }, [
+      it.section + ", p. " + it.page, L.el("span", { class: "visually-hidden", text: " (opens the regulation in a new tab)" })
+    ]) : null;
+  }
+
+  function noticePanel(full) {
+    var N = window.LMBNotice;
+    if (!N) return null;
+    var state = N.formFromHash(window.location.hash);
+    var out = L.el("div", { class: "notice-out" });
+    // One short sentence for screen readers when the date or type changes, not the whole table on every keystroke.
+    var status = L.el("p", { class: "visually-hidden", role: "status" });
+
+    var dateIn = L.el("input", { id: "notice-date", class: "field-input", type: "date", value: state.date || "", min: "2020-01-01", max: "2099-12-31", "aria-describedby": "notice-date-hint" });
+    var carbIn = L.el("input", { id: "notice-carb", class: "field-input", type: "text", value: state.carb || "", maxlength: "40", autocomplete: "off", spellcheck: "false" });
+    var radios = Object.keys(N.TYPES).map(function (k) {
+      var r = L.el("input", { type: "radio", name: "notice-type", id: "notice-type-" + k, value: k });
+      if (k === state.type) r.checked = true;
+      return L.el("label", { class: "choice", for: "notice-type-" + k }, [r, " " + N.TYPES[k]]);
+    });
+    var clear = L.el("button", { type: "button", class: "btn btn--small", text: "Clear" });
+
+    function read() {
+      var checked = document.querySelector('input[name="notice-type"]:checked');
+      return { date: dateIn.value, type: checked ? checked.value : "unknown", carb: N.cleanCarb(carbIn.value.trim()) };
+    }
+    var lastKey = "";
+    function update() {
+      var st = read(), valid = N.validNoticeDate(st.date);
+      history.replaceState(null, "", L.hashFor(full.id, range) + N.formToHash(st));
+      var briefBtn = detailEl.querySelector(".detail-head .btn--primary");
+      if (briefBtn) briefBtn.setAttribute("href", "brief.html" + L.hashFor(full.id, range) + N.toHash(st));
+      renderNoticeOut(out, st, valid);
+      var key = (valid ? st.date : "") + "|" + st.type;
+      if (key !== lastKey) {
+        lastKey = key;
+        var first = valid ? N.steps(st.date, st.type).dated[0] : null;
+        status.textContent = first ? "Due dates shown. First: " + first.short.toLowerCase() + ", due " + L.fmtDate(first.due) + "." : "";
+      }
+    }
+    [dateIn, carbIn].forEach(function (i) { i.addEventListener("input", update); });
+    radios.forEach(function (lab) { lab.querySelector("input").addEventListener("change", update); });
+    clear.addEventListener("click", function () {
+      dateIn.value = ""; carbIn.value = "";
+      document.getElementById("notice-type-unknown").checked = true;
+      update(); dateIn.focus();
+    });
+
+    var form = L.el("div", { class: "notice-form" }, [
+      L.el("div", { class: "field" }, [
+        L.el("label", { for: "notice-date", class: "field-label", text: "Date the operator received CARB’s notice" }),
+        dateIn,
+        L.el("p", { id: "notice-date-hint", class: "field-hint", text: "Ask the operator, or check CARB’s CalSMP dashboard. The notice is an email from CARB with an ID number and the plume’s location." })
+      ]),
+      L.el("fieldset", { class: "field" }, [L.el("legend", { class: "field-label", text: "Landfill type" })].concat(radios)),
+      L.el("div", { class: "field" }, [
+        L.el("label", { for: "notice-carb", class: "field-label", text: "CARB ID number (optional)" }), carbIn
+      ]),
+      L.el("div", { class: "field field--end" }, [clear])
+    ]);
+    renderNoticeOut(out, state, N.validNoticeDate(state.date));
+    return L.el("section", { class: "block notice", "aria-labelledby": "notice-title" }, [
+      L.el("h2", { id: "notice-title", text: "After a CARB notice: due dates and what to ask" }),
+      L.el("p", { class: "lede", text: "If CARB has notified this landfill’s operator of a plume, enter the date the notice arrived to see when each step is due under the 2027 rule, and what to ask the operator." }),
+      form, status, out
+    ]);
+  }
+
+  function renderNoticeOut(out, st, valid) {
+    var N = window.LMBNotice;
+    out.textContent = "";
+    if (!valid) {
+      out.appendChild(L.el("p", { class: "note", text: "Enter the date the notice arrived to see the due dates." }));
+      return;
+    }
+    var today = localToday(), s = N.steps(st.date, st.type);
+    if (st.date < N.EFFECTIVE) {
+      out.appendChild(L.el("p", { class: "range-note", text: "This date is before the amended rule takes effect on " + L.fmtDate(N.EFFECTIVE) + ". The due dates below come from the amended rule and may not apply to an earlier notice." }));
+    }
+    if (st.date > today) {
+      out.appendChild(L.el("p", { class: "range-note", text: "This date is in the future. Check that it is the date the operator received the notice." }));
+    }
+    var both = st.type === "unknown";
+    var rows = s.dated.map(function (d) {
+      var where = N.standing(d.due, today);
+      return L.el("tr", { class: "due--" + where.key }, [
+        L.el("td", {}, [L.el("span", { class: "due-date", text: L.fmtDate(d.due) }), L.el("span", { class: "due-standing", text: where.text })]),
+        L.el("td", {}, [
+          both ? L.el("span", { class: "due-type", text: d.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null,
+          d.what + " (" + d.days + " days after the notice). ", citeLink(d.item)
+        ]),
+        L.el("td", { text: d.ask })
+      ]);
+    });
+    out.appendChild(L.el("div", { class: "table-wrap", role: "region", "aria-label": "Due dates after the notice", tabindex: "0" }, [
+      L.el("table", { class: "table notice-table" }, [
+        L.el("caption", { class: "visually-hidden", text: "Due dates after a CARB notice received " + L.fmtDate(st.date) }),
+        L.el("thead", {}, [L.el("tr", {}, [
+          L.el("th", { scope: "col", text: "Due" }), L.el("th", { scope: "col", text: "Step and rule" }), L.el("th", { scope: "col", text: "Ask the operator" })
+        ])]),
+        L.el("tbody", {}, rows)
+      ])
+    ]));
+    if (s.conditional.length) {
+      out.appendChild(L.el("h3", { class: "notice-sub", text: "Depending on what the survey finds" }));
+      out.appendChild(L.el("ul", { class: "notice-cond" }, s.conditional.map(function (c) {
+        return L.el("li", {}, [
+          L.el("p", {}, [both ? L.el("span", { class: "due-type", text: c.type === "controlled" ? "If controlled: " : "If uncontrolled: " }) : null, c.what + ". ", citeLink(c.item)]),
+          L.el("p", { class: "notice-ask" }, ["Ask: " + c.ask])
+        ]);
+      })));
+    }
+    out.appendChild(L.el("p", { class: "note", text: "Due dates are the date the notice arrived plus the number of calendar days the rule gives. The rule does not say whether a weekend or holiday moves a due date, so confirm exact dates with CARB. A passed date is a prompt to ask, not a finding that a step was missed." +
+      (st.carb ? " CARB ID: " + st.carb + "." : "") }));
+  }
+
+  function chartOpts() {
+    return range === "all" ? {} : { from: D.recent_since, to: D.fetched_at.slice(0, 10) };
+  }
+
+  function renderSite(full) {
+    var site = L.view(full, range);
+    currentSite = full;
     var kinds = L.kindCounts(site);
     var withheld = site.plume_count - site.quantified_count;
     detailEl.textContent = "";
@@ -149,7 +386,7 @@
     var head = L.el("header", { class: "detail-head" }, [
       L.el("div", { class: "detail-title" }, [L.el("h1", { text: site.name }), meta]),
       L.el("div", { class: "actions" }, [
-        L.el("a", { class: "btn btn--primary", href: "brief.html#site=" + site.id, text: "Generate one-page brief" }),
+        L.el("a", { class: "btn btn--primary", href: "brief.html" + L.hashFor(site.id, range) + (window.LMBNotice ? window.LMBNotice.toHash(window.LMBNotice.fromHash(window.location.hash)) : ""), text: "Generate one-page brief" }),
         L.el("a", { class: "btn", href: L.LINKS.calsmp, rel: "noopener", target: "_blank" }, [
           "Check CARB notices", L.el("span", { class: "visually-hidden", text: " on the CalSMP dashboard (opens in a new tab)" })
         ])
@@ -163,7 +400,18 @@
         ")." + (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? " This is a closed landfill with a single detection; treat the match with care." : "")
       ]));
     } else {
-      detailEl.appendChild(L.el("p", { class: "note", text: "No registered landfill was matched within 3 km of these detections." }));
+      var nr = site.nearest_record;
+      detailEl.appendChild(L.el("p", { class: "note" }, nr ? [
+        "No registered landfill lies within 3 km of these detections, so the site is not named. The nearest EPA landfill record is " +
+          nr.name + ", " + nr.distance_km.toFixed(1) + " km from the site centre (",
+        L.el("a", { href: nr.source_url, rel: "noopener", target: "_blank" }, ["source record", L.el("span", { class: "visually-hidden", text: " (opens in a new tab)" })]),
+        "). EPA locations are sometimes an office address rather than the landfill itself."
+      ] : ["No registered landfill was matched within 10 km of these detections."]));
+    }
+    if (site.outlying_groups) {
+      detailEl.appendChild(L.el("p", { class: "note", text: "Includes " + L.plural(site.outlying_detections, "detection") +
+        " more than 1 km from the main group but within 3 km of this landfill’s registered location, counted here as part of the same landfill. " +
+        "The furthest detection is " + site.max_km_from_center.toFixed(1) + " km from the site centre; a neighbouring source is possible." }));
     }
     if (site.nearby_other_sector) {
       detailEl.appendChild(L.el("p", { class: "note", text: L.plural(site.nearby_other_sector, "other plume") +
@@ -171,33 +419,88 @@
         " classed by Carbon Mapper as a non-waste source and " + (site.nearby_other_sector === 1 ? "is" : "are") + " not counted here." }));
     }
 
-    // stats
-    detailEl.appendChild(L.el("dl", { class: "stats" }, [
-      stat("Plumes detected", String(site.plume_count), null, site.first_date === site.last_date ? "on " + L.fmtDate(site.first_date) : L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
-      stat("Median rate", site.median_rate_kg_h == null ? "n/a" : L.fmtRate(site.median_rate_kg_h), site.median_rate_kg_h == null ? null : "kg/h",
-        "of " + L.plural(site.quantified_count, "plume") + " with a published rate"),
-      stat("Largest rate", site.max_rate_kg_h == null ? "n/a" : L.fmtRate(site.max_rate_kg_h), site.max_rate_kg_h == null ? null : "kg/h",
-        site.max_rate_kg_h == null ? null : "± " + L.fmtRate(site.max_rate_uncertainty_kg_h) + " kg/h, " + L.fmtDate(site.max_rate_date)),
-      stat("Seen from aircraft", String(kinds.aircraft), null, "and " + kinds.space + " from satellites")
-    ]));
+    // range, stats, timeline
+    detailEl.appendChild(rangeNote(site));
+    if (!site.plume_count) {
+      detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
+        L.el("h2", { id: "timeline-title", text: "No detections in " + L.windowLabel() }),
+        L.el("p", { class: "lede", text: "Carbon Mapper published no plume at this site between " + L.fmtDate(D.recent_since) + " and " + L.fmtDate(D.fetched_at) +
+          ". That does not mean nothing leaked: the site may not have been flown over, or passed by a satellite with clear skies. The last detection was on " + L.fmtDate(full.last_date) + "." }),
+        L.el("p", {}, [L.el("a", { class: "btn", href: L.hashFor(full.id, "all"), text: "Show the full history (" + L.plural(full.plume_count, "detection") + ")" })])
+      ]));
+    } else {
+      detailEl.appendChild(L.el("dl", { class: "stats" }, [
+        stat(range === "all" ? "Plumes detected" : "Plumes detected, last " + D.recent_months + " months", String(site.plume_count), null,
+          site.first_date === site.last_date ? "on " + L.fmtDate(site.first_date) : L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
+        stat("Median rate", site.median_rate_kg_h == null ? "n/a" : L.fmtRate(site.median_rate_kg_h), site.median_rate_kg_h == null ? null : "kg/h",
+          "of " + L.plural(site.quantified_count, "plume") + " with a published rate"),
+        stat("Largest rate", site.max_rate_kg_h == null ? "n/a" : L.fmtRate(site.max_rate_kg_h), site.max_rate_kg_h == null ? null : "kg/h",
+          site.max_rate_kg_h == null ? null : "± " + L.fmtRate(site.max_rate_uncertainty_kg_h) + " kg/h, " + L.fmtDate(site.max_rate_date)),
+        stat("Seen from aircraft", String(kinds.aircraft), null, "and " + kinds.space + " from satellites")
+      ]));
 
-    // timeline
-    var chartBox = L.el("div", { class: "chart-box" });
-    var legend = L.el("ul", { class: "legend", "aria-label": "Chart key" }, [
-      L.el("li", {}, [L.el("span", { class: "key key--dot", "aria-hidden": "true" }), "One detection at its estimated rate"]),
-      L.el("li", {}, [L.el("span", { class: "key key--whisker", "aria-hidden": "true" }), "Published uncertainty (±)"]),
-      withheld ? L.el("li", {}, [L.el("span", { class: "key key--square", "aria-hidden": "true" }), "Detected, rate not published (" + withheld + ")"]) : null
-    ]);
-    detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
-      L.el("h2", { id: "timeline-title", text: site.first_date.slice(0, 4) === site.last_date.slice(0, 4) ? "Every detection, " + site.first_date.slice(0, 4) : "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4) }),
-      L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site; dots from the same day are spread a few pixels apart. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
-      legend, chartBox,
-      L.el("details", { class: "more" }, [
-        L.el("summary", { text: "All " + L.plural(site.plume_count, "detection") + " as a table" }),
-        plumeTable(site)
-      ])
-    ]));
-    window.LMBChart.render(chartBox, site);
+      var chartBox = L.el("div", { class: "chart-box" });
+      var legend = L.el("ul", { class: "legend", "aria-label": "Chart key" }, [
+        L.el("li", {}, [L.el("span", { class: "key key--dot", "aria-hidden": "true" }), "One detection at its estimated rate"]),
+        L.el("li", {}, [L.el("span", { class: "key key--whisker", "aria-hidden": "true" }), "Published uncertainty (±)"]),
+        withheld ? L.el("li", {}, [L.el("span", { class: "key key--square", "aria-hidden": "true" }), "Detected, rate not published (" + withheld + ")"]) : null
+      ]);
+      var heading = range !== "all" ? "Detections in " + L.windowLabel()
+        : site.first_date.slice(0, 4) === site.last_date.slice(0, 4) ? "Every detection, " + site.first_date.slice(0, 4)
+        : "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4);
+      detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
+        L.el("h2", { id: "timeline-title", text: heading }),
+        L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site; dots from the same day are spread a few pixels apart. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
+        legend, chartBox,
+        L.el("details", { class: "more" }, [
+          L.el("summary", { text: (range === "all" ? "All " : "These ") + L.plural(site.plume_count, "detection") + " as a table" }),
+          plumeTable(site)
+        ])
+      ]));
+      window.LMBChart.render(chartBox, site, chartOpts());
+
+      // where detections repeat (same rule as the brief: within 200 m, on two or more days)
+      if (window.LMBSpots) {
+        var spots = window.LMBSpots.findSpots(site.plumes);
+        var radiusM = Math.round(window.LMBSpots.SPOT_KM * 1000);
+        var spotBlock = [
+          L.el("h2", { id: "spots-title", text: "Where detections repeat" }),
+          L.el("p", { class: "lede", text: spots.length
+            ? spots[0].n + " of " + site.plume_count + " detections " + (range === "all" ? "in the full record" : "in " + L.windowLabel()) +
+              " fall within " + radiusM + " m of one spot. Each spot below had detections on at least two different days, so it is not one flyover counted twice."
+            : "No spot had detections within " + radiusM + " m of each other on more than one day " + (range === "all" ? "in the full record." : "in " + L.windowLabel() + ".") })
+        ];
+        if (spots.length) {
+          spotBlock.push(L.el("div", { class: "table-wrap", role: "region", "aria-label": "Spots where detections repeat", tabindex: "0" }, [
+            L.el("table", { class: "table" }, [
+              L.el("caption", { class: "visually-hidden", text: "Spots where detections repeat at " + site.name }),
+              L.el("thead", {}, [L.el("tr", {}, [
+                L.el("th", { scope: "col", text: "Spot" }), L.el("th", { scope: "col", class: "num", text: "Detections" }),
+                L.el("th", { scope: "col", class: "num", text: "Days" }), L.el("th", { scope: "col", text: "First to last" }),
+                L.el("th", { scope: "col", class: "num", text: "Largest, kg/h" }), L.el("th", { scope: "col", text: "Ask the operator" })
+              ])]),
+              L.el("tbody", {}, spots.slice(0, 5).map(function (sp) {
+                return L.el("tr", {}, [
+                  L.el("td", { class: "num", text: sp.lat.toFixed(4) + ", " + sp.lon.toFixed(4) }),
+                  L.el("td", { class: "num", text: String(sp.n) }),
+                  L.el("td", { class: "num", text: String(sp.days) }),
+                  L.el("td", { text: L.fmtDate(sp.first) + " to " + L.fmtDate(sp.last) }),
+                  L.el("td", { class: "num", text: sp.top ? L.fmtRate(sp.top.rate_kg_h) + " ± " + L.fmtRate(sp.top.uncertainty_kg_h) : "not published" }),
+                  L.el("td", { text: "What is at this spot, and has it been checked or repaired since " + L.fmtDate(sp.last) + "?" })
+                ]);
+              }))
+            ])
+          ]));
+          spotBlock.push(L.el("p", { class: "note", text: "Locations are Carbon Mapper’s estimated plume origins, not ground measurements." +
+            (spots.length > 5 ? " The five spots with the most detections are shown." : "") }));
+        }
+        detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "spots-title" }, spotBlock));
+      }
+    }
+
+    // after a CARB notice
+    var notice = noticePanel(full);
+    if (notice) detailEl.appendChild(notice);
 
     // checklist
     var dutiesBox = L.el("div", { class: "checklist" });
@@ -209,26 +512,24 @@
     window.LMBChecklist.render(dutiesBox);
 
     // selection state
-    Array.prototype.forEach.call(listEl.querySelectorAll(".site"), function (a) {
-      if (a.getAttribute("data-site") === site.id) a.setAttribute("aria-current", "true");
-      else a.removeAttribute("aria-current");
-    });
-    Object.keys(markers).forEach(function (id) {
-      var path = markers[id].getElement && markers[id].getElement();
-      if (path) path.classList.toggle("is-current", id === site.id);
-    });
+    markCurrent(site.id);
     document.title = site.name + ": methane plume history and the 2027 rule";
   }
 
   function route(focus) {
     var asked = L.siteIdFromHash();
+    var newRange = D.recent_since ? L.rangeFromHash() : "all";
+    var rangeChanged = newRange !== range;
+    range = newRange;
+    if (rangeChanged || !listEl.querySelector(".site")) renderRail();
     var site = L.siteById(asked) || D.sites[0];
     renderSite(site);
     if (asked && asked !== site.id) {
-      history.replaceState(null, "", "#site=" + site.id);
+      history.replaceState(null, "", L.hashFor(site.id, range) + (window.LMBNotice ? window.LMBNotice.formToHash(window.LMBNotice.formFromHash(window.location.hash)) : ""));
       detailEl.insertBefore(L.el("p", { class: "note", text: "No landfill matches “" + asked + "”, so the site with the most detections is shown." }), detailEl.children[1]);
     }
     if (statusEl) { detailEl.prepend(statusEl); statusEl.textContent = "Showing " + site.name; }
+    if (keepFocus) { keepFocus = false; focus = false; }
     if (focus) {
       var h1 = detailEl.querySelector("h1");
       h1.setAttribute("tabindex", "-1");
@@ -260,7 +561,7 @@
       if (Math.abs(window.innerWidth - lastW) < 40) return;
       lastW = window.innerWidth;
       var box = detailEl.querySelector(".chart-box"), site = L.siteById(L.siteIdFromHash()) || D.sites[0];
-      if (box) window.LMBChart.render(box, site);
+      if (box) window.LMBChart.render(box, L.view(site, range), chartOpts());
     }, 200);
   });
 })();

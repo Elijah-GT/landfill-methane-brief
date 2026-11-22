@@ -116,3 +116,13 @@ class TestMatchName:
 
     def test_none_when_too_far(self):
         assert match_name(38.0, -121.0, self.NAMES, 2.0) is None
+
+
+def test_in_california_border():
+    from pipeline.sites import in_california
+    assert in_california(38.52, -121.19)        # Kiefer Landfill, Sacramento County
+    assert in_california(33.23, -115.99)        # Salton Sea area, Imperial County
+    assert in_california(39.5, -120.05)         # just west of the 120th meridian
+    assert not in_california(39.5, -119.9)      # Reno side of the meridian
+    assert not in_california(36.375, -114.865)  # Apex area, Clark County, Nevada
+    assert not in_california(42.1, -122.0)      # Oregon

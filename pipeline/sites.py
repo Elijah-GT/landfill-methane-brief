@@ -80,3 +80,24 @@ def match_name(lat: float, lon: float, names: list[dict], radius_km: float) -> d
         if d <= best_d:
             best, best_d = entry, d
     return best
+
+
+# California's eastern boundary north of the Colorado River: the 120th meridian from 42° N
+# down to 39° N (in Lake Tahoe), then a straight line to the Colorado River at 35° N
+# (Cal. Const. of 1849, art. XII; Gov. Code § 162). The river point is about 35.0019 N, 114.6333 W.
+_TAHOE = (39.0, -120.0)
+_RIVER = (35.0019, -114.6333)
+
+
+def in_california(lat: float, lon: float) -> bool:
+    """False for points clearly outside California: north of 42° N, or east of the
+    Nevada line. Points south of 35° N are not tested against the Arizona or Mexico
+    borders; build_sites.py warns about sites near those so they can be checked by hand."""
+    if lat > 42.0:
+        return False
+    if lat >= _TAHOE[0]:
+        return lon <= _TAHOE[1]
+    if lat >= _RIVER[0]:
+        t = (_TAHOE[0] - lat) / (_TAHOE[0] - _RIVER[0])
+        return lon <= _TAHOE[1] + t * (_RIVER[1] - _TAHOE[1])
+    return True
