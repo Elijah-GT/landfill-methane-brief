@@ -1,0 +1,210 @@
+// Main screen: site list + map on the left, the selected site on the right.
+// Selection lives in the URL hash (#site=<id>) so a link opens the same landfill.
+(function () {
+  "use strict";
+  var L = window.LMB, D = L.data();
+  var listEl = document.getElementById("site-list");
+  var detailEl = document.getElementById("detail");
+  var map = null, markers = {};
+
+  function showError(msg) {
+    detailEl.textContent = "";
+    detailEl.appendChild(L.el("div", { class: "state state--error", role: "alert" }, [
+      L.el("h1", { text: "The landfill data did not load" }),
+      L.el("p", { text: msg })
+    ]));
+    listEl.textContent = "";
+  }
+
+  if (!D) {
+    showError("The file web/data/sites.js is missing or broken. From the project folder run: python pipeline/build_sites.py, then reload this page.");
+    return;
+  }
+  if (!D.sites.length) {
+    showError("The snapshot holds no waste-sector plumes for this area, so there is nothing to list. Run python pipeline/fetch_plumes.py with a wider --bbox, then python pipeline/build_sites.py.");
+    return;
+  }
+
+  // ---------- rail: note, list, map ----------
+  document.getElementById("rail-note").textContent =
+    L.plural(D.waste_plumes, "waste-sector plume") + " seen from aircraft and satellites between " +
+    L.fmtDate(D.oldest_observation) + " and " + L.fmtDate(D.newest_observation) +
+    ", grouped into sites where detections fall within " + D.cluster_km + " km of each other.";
+
+  listEl.textContent = "";
+  D.sites.forEach(function (s) {
+    var btn = L.el("a", { class: "site", href: "#site=" + s.id, "data-site": s.id }, [
+      L.el("span", { class: "site-name", text: s.name }),
+      L.el("span", { class: "site-sub", text: (s.county || "County not matched") }),
+      L.el("span", { class: "site-count" }, [
+        L.el("span", { class: "site-figure", text: String(s.plume_count) }),
+        L.el("span", { class: "site-unit", text: s.plume_count === 1 ? " plume" : " plumes" })
+      ]),
+      L.el("span", { class: "site-sub site-last", text: "Last seen " + L.fmtDate(s.last_date) })
+    ]);
+    listEl.appendChild(L.el("li", {}, [btn]));
+  });
+
+  function initMap() {
+    var box = document.getElementById("map");
+    if (!window.L || !window.L.map) { box.hidden = true; return; }
+    map = window.L.map(box, { scrollWheelZoom: false, attributionControl: true, zoomSnap: 0.25 });
+    window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+    var bounds = [];
+    D.sites.forEach(function (s) {
+      var r = 5 + Math.sqrt(s.plume_count) * 2;
+      var mk = window.L.circleMarker([s.lat, s.lon], { radius: r, className: "site-marker", weight: 2 });
+      mk.bindTooltip(s.name + ": " + L.plural(s.plume_count, "plume"));
+      mk.on("click", function () { window.location.hash = "site=" + s.id; });
+      mk.addTo(map);
+      markers[s.id] = mk;
+      bounds.push([s.lat, s.lon]);
+    });
+    map.fitBounds(bounds, { padding: [24, 24] });
+  }
+
+  // ---------- detail ----------
+  function stat(label, figure, unit, sub) {
+    return L.el("div", { class: "stat" }, [
+      L.el("dt", { class: "stat-label", text: label }),
+      L.el("dd", { class: "stat-value" }, [
+        L.el("span", { class: "stat-figure", text: figure }),
+        unit ? L.el("span", { class: "stat-unit", text: unit }) : null
+      ]),
+      sub ? L.el("dd", { class: "stat-sub", text: sub }) : null
+    ]);
+  }
+
+  function plumeTable(site) {
+    var rows = site.plumes.slice().reverse().map(function (p) {
+      return L.el("tr", {}, [
+        L.el("td", { text: L.fmtDate(p.date) }),
+        L.el("td", { class: "num", text: p.rate_kg_h == null ? "not published" : L.fmtRate(p.rate_kg_h) }),
+        L.el("td", { class: "num", text: p.uncertainty_kg_h == null ? "" : "± " + L.fmtRate(p.uncertainty_kg_h) }),
+        L.el("td", { text: L.platform(p.platform).label }),
+        L.el("td", { class: "num", text: p.km_from_center.toFixed(1) }),
+        L.el("td", { class: "mono-id", text: p.plume_id })
+      ]);
+    });
+    return L.el("div", { class: "table-wrap", role: "region", "aria-label": "All detections, scrollable", tabindex: "0" }, [
+      L.el("table", { class: "table" }, [
+        L.el("caption", { class: "visually-hidden", text: "Every detection at " + site.name + ", newest first" }),
+        L.el("thead", {}, [L.el("tr", {}, [
+          L.el("th", { scope: "col", text: "Observed" }),
+          L.el("th", { scope: "col", class: "num", text: "Rate, kg/h" }),
+          L.el("th", { scope: "col", class: "num", text: "Uncertainty" }),
+          L.el("th", { scope: "col", text: "Seen by" }),
+          L.el("th", { scope: "col", class: "num", text: "Km from site centre" }),
+          L.el("th", { scope: "col", text: "Carbon Mapper plume ID" })
+        ])]),
+        L.el("tbody", {}, rows)
+      ])
+    ]);
+  }
+
+  function renderSite(site) {
+    var kinds = L.kindCounts(site);
+    var withheld = site.plume_count - site.quantified_count;
+    detailEl.textContent = "";
+
+    // head
+    var meta = L.el("dl", { class: "meta" }, [
+      site.official_name ? L.el("div", {}, [L.el("dt", { text: "Registered name" }), L.el("dd", { text: site.official_name })]) : null,
+      site.county ? L.el("div", {}, [L.el("dt", { text: "County" }), L.el("dd", { text: site.county })]) : null,
+      site.operator ? L.el("div", {}, [L.el("dt", { text: "Owner or parent company" }), L.el("dd", { text: site.operator })]) : null,
+      L.el("div", {}, [L.el("dt", { text: "Site centre" }), L.el("dd", { class: "num", text: site.lat.toFixed(4) + ", " + site.lon.toFixed(4) })])
+    ]);
+    var head = L.el("header", { class: "detail-head" }, [
+      L.el("div", { class: "detail-title" }, [L.el("h1", { text: site.name }), meta]),
+      L.el("div", { class: "actions" }, [
+        L.el("a", { class: "btn btn--primary", href: "brief.html#site=" + site.id, text: "Generate one-page brief" }),
+        L.el("a", { class: "btn", href: L.LINKS.calsmp, rel: "noopener", target: "_blank" }, [
+          "Check CARB notices", L.el("span", { class: "visually-hidden", text: " on the CalSMP dashboard (opens in a new tab)" })
+        ])
+      ])
+    ]);
+    detailEl.appendChild(head);
+    if (site.name_source_url) {
+      detailEl.appendChild(L.el("p", { class: "note" }, [
+        "Name matched to the registered facility " + site.name_distance_km.toFixed(1) + " km from the site centre (",
+        L.el("a", { href: site.name_source_url, rel: "noopener", target: "_blank", text: "source record" }),
+        ")." + (site.name_confidence && site.name_confidence.indexOf("closed") >= 0 ? " This is a closed landfill with a single detection; treat the match with care." : "")
+      ]));
+    } else {
+      detailEl.appendChild(L.el("p", { class: "note", text: "No registered landfill was matched within 3 km of these detections." }));
+    }
+
+    // stats
+    detailEl.appendChild(L.el("dl", { class: "stats" }, [
+      stat("Plumes detected", String(site.plume_count), null, L.fmtDate(site.first_date) + " to " + L.fmtDate(site.last_date)),
+      stat("Median rate", site.median_rate_kg_h == null ? "n/a" : L.fmtRate(site.median_rate_kg_h), site.median_rate_kg_h == null ? null : "kg/h",
+        "of " + L.plural(site.quantified_count, "plume") + " with a published rate"),
+      stat("Largest rate", site.max_rate_kg_h == null ? "n/a" : L.fmtRate(site.max_rate_kg_h), site.max_rate_kg_h == null ? null : "kg/h",
+        site.max_rate_kg_h == null ? null : "± " + L.fmtRate(site.max_rate_uncertainty_kg_h) + " kg/h, " + L.fmtDate(site.max_rate_date)),
+      stat("Seen from aircraft", String(kinds.aircraft), null, "and " + kinds.space + " from satellites")
+    ]));
+
+    // timeline
+    var chartBox = L.el("div", { class: "chart-box" });
+    var legend = L.el("ul", { class: "legend", "aria-label": "Chart key" }, [
+      L.el("li", {}, [L.el("span", { class: "key key--dot", "aria-hidden": "true" }), "One detection at its estimated rate"]),
+      L.el("li", {}, [L.el("span", { class: "key key--whisker", "aria-hidden": "true" }), "Published uncertainty (±)"]),
+      withheld ? L.el("li", {}, [L.el("span", { class: "key key--square", "aria-hidden": "true" }), "Detected, rate not published (" + withheld + ")"]) : null
+    ]);
+    detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "timeline-title" }, [
+      L.el("h2", { id: "timeline-title", text: "Every detection, " + site.first_date.slice(0, 4) + " to " + site.last_date.slice(0, 4) }),
+      L.el("p", { class: "lede", text: "Each dot is one plume Carbon Mapper published near this site. Gaps mean no flight or satellite pass was published, not that nothing leaked." }),
+      legend, chartBox,
+      L.el("details", { class: "more" }, [
+        L.el("summary", { text: "All " + L.plural(site.plume_count, "detection") + " as a table" }),
+        plumeTable(site)
+      ])
+    ]));
+    window.LMBChart.render(chartBox, site);
+
+    // checklist
+    var dutiesBox = L.el("div", { class: "checklist" });
+    detailEl.appendChild(L.el("section", { class: "block", "aria-labelledby": "duties-title" }, [
+      L.el("h2", { id: "duties-title", text: "What the 2027 rule asks after a CARB notice" }),
+      L.el("p", { class: "lede", text: "Applies from January 1, 2027. Use it to know what to ask the operator, not to judge them." }),
+      dutiesBox
+    ]));
+    window.LMBChecklist.render(dutiesBox);
+
+    // selection state
+    Array.prototype.forEach.call(listEl.querySelectorAll(".site"), function (a) {
+      if (a.getAttribute("data-site") === site.id) a.setAttribute("aria-current", "true");
+      else a.removeAttribute("aria-current");
+    });
+    Object.keys(markers).forEach(function (id) {
+      var path = markers[id].getElement && markers[id].getElement();
+      if (path) path.classList.toggle("is-current", id === site.id);
+    });
+    document.title = site.name + ": methane plume history and the 2027 rule";
+  }
+
+  function route(focus) {
+    var site = L.siteById(L.siteIdFromHash()) || D.sites[0];
+    renderSite(site);
+    if (focus) detailEl.focus({ preventScroll: false });
+  }
+
+  // ---------- about facts ----------
+  var lag = D.publication_lag_days;
+  var facts = document.getElementById("data-facts");
+  [
+    ["Plume data", "Carbon Mapper public catalog, fetched " + L.fmtDate(D.fetched_at) + ". Newest observation in this snapshot: " + L.fmtDate(D.newest_observation) + "."],
+    ["Publication delay", "Carbon Mapper releases data about 30 days after each observation. In this snapshot, plumes observed since 2025 were published at least " + lag.min + " days later (median " + lag.median + " days)."],
+    ["Rates", "Estimated emission rate in kilograms of methane per hour, with Carbon Mapper’s published ± uncertainty (wind and plume-enhancement error). Rounded to two significant figures."],
+    ["Instruments", "Aircraft (Global Airborne Observatory, AVIRIS-NG, AVIRIS-3) and satellites (Planet’s Tanager-1, NASA’s EMIT on the ISS). Each saw only the moments it flew over."],
+    ["Sites", "Waste-sector plumes (sector 6A, solid waste disposal on land) grouped when a chain of detections lies within " + D.cluster_km + " km. Names come from EPA GHGRP and CalRecycle records, with the source linked on each site."]
+  ].forEach(function (f) {
+    facts.appendChild(L.el("div", {}, [L.el("dt", { text: f[0] }), L.el("dd", { text: f[1] })]));
+  });
+
+  initMap();
+  route(false);
+  window.addEventListener("hashchange", function () { route(true); });
+})();

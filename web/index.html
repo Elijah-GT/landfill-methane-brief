@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Landfill methane brief: Sacramento-area plume history and the 2027 rule</title>
+  <meta name="description" content="Pick a Sacramento-area landfill to see every methane plume detected by aircraft and satellites, what California’s 2027 rule asks of the operator, and a one-page printable brief.">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <a class="skip" href="#detail">Skip to the selected landfill</a>
+  <header class="bar">
+    <div class="bar-inner">
+      <a class="wordmark" href="./" aria-label="Landfill methane brief, home">Landfill methane brief</a>
+      <nav aria-label="Site">
+        <ul class="bar-links">
+          <li><a href="#about">Data and limits</a></li>
+          <li><a href="https://ww2.arb.ca.gov/our-work/programs/california-satellite-methane-project/calsmp-dashboard" rel="noopener" target="_blank">CARB CalSMP dashboard<span class="visually-hidden"> (opens in a new tab)</span></a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <aside class="rail" aria-labelledby="rail-title">
+      <h2 id="rail-title" class="rail-title">Sacramento-area landfills</h2>
+      <p class="rail-note" id="rail-note">Waste-sector methane plumes seen from aircraft and satellites, grouped into sites.</p>
+      <div id="map" class="map" aria-label="Map of the landfill sites; the list below has the same sites"></div>
+      <ol id="site-list" class="site-list" aria-label="Landfills, most detections first">
+        <li class="site-skeleton" aria-hidden="true"></li>
+        <li class="site-skeleton" aria-hidden="true"></li>
+        <li class="site-skeleton" aria-hidden="true"></li>
+      </ol>
+    </aside>
+
+    <section id="detail" class="detail" tabindex="-1" aria-live="polite">
+      <noscript><p class="state">This tool needs JavaScript to read its bundled data file. The data itself is in <code>web/data/sites.js</code>.</p></noscript>
+      <div class="state state--loading" aria-hidden="true">
+        <div class="skeleton skeleton--head"></div>
+        <div class="skeleton skeleton--row"></div>
+        <div class="skeleton skeleton--chart"></div>
+      </div>
+    </section>
+  </main>
+
+  <section id="about" class="about" aria-labelledby="about-title">
+    <div class="about-inner">
+      <h2 id="about-title">What this tool is, and what it is not</h2>
+      <div class="about-grid">
+        <div>
+          <h3>It is</h3>
+          <ul class="plain">
+            <li>A history of methane plumes that Carbon Mapper detected near each landfill and published, with dates, rates and uncertainty.</li>
+            <li>A plain-language summary of what California’s amended Landfill Methane Regulation requires once CARB notifies an operator, with every item tied to its section.</li>
+            <li>A per-site companion to <a href="https://ww2.arb.ca.gov/our-work/programs/california-satellite-methane-project/calsmp-dashboard" rel="noopener" target="_blank">CARB’s CalSMP dashboard<span class="visually-hidden"> (opens in a new tab)</span></a>, which shows official notification status.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>It is not</h3>
+          <ul class="plain">
+            <li>Legal advice or an official CARB determination. It does not say whether any landfill is meeting the rule.</li>
+            <li>An alert system. Public plume data is released about 30 days after each observation.</li>
+            <li>Proof of the source. A plume near a landfill may come from a neighbouring activity, and every rate carries the uncertainty shown.</li>
+          </ul>
+        </div>
+      </div>
+      <dl class="facts" id="data-facts"></dl>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="foot-inner">
+      <p>Plume data: Source: Carbon Mapper (<a href="https://data.carbonmapper.org" rel="noopener">data.carbonmapper.org</a>), used non-commercially under the <a href="https://carbonmapper.org/terms" rel="noopener">Carbon Mapper Terms of Use</a>.</p>
+      <p>Regulation: California Air Resources Board, <a href="https://ww2.arb.ca.gov/resources/documents/landfill-methane-regulation" rel="noopener">Landfill Methane Regulation</a>. Landfill names: U.S. EPA Greenhouse Gas Reporting Program and CalRecycle SWIS.</p>
+      <p>Map data &copy; OpenStreetMap contributors. Built for EvoHacks 2. Code under the MIT license; data under its providers' terms.</p>
+    </div>
+  </footer>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="data/sites.js"></script>
+  <script src="data/checklist.js"></script>
+  <script src="common.js"></script>
+  <script src="chart.js"></script>
+  <script src="checklist-view.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

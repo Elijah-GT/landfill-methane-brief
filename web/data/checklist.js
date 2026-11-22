@@ -1,7 +1,7 @@
 // Operator duties under the amended California Landfill Methane Regulation
 // (title 17 CCR 95460 et seq.), effective January 1, 2027, for remotely detected
 // methane plumes. Every item was checked against the regulation text; each quote
-// is verbatim from CARB's unofficial clean copy (page numbers refer to that PDF).
+// is verbatim from CARB’s unofficial clean copy (page numbers refer to that PDF).
 // Hand-written; see NOTES.md for how each item was verified.
 window.LMB_CHECKLIST = {
   regulation: {
@@ -26,7 +26,8 @@ window.LMB_CHECKLIST = {
       items: [
         {
           id: "survey-surface",
-          duty: "Walk and test the ground surface for methane across a 600 ft by 600 ft square centered on CARB's estimated plume location.",
+          brief: "Survey the ground surface for methane in a 600 ft square centered on CARB’s plume location.",
+          duty: "Walk and test the ground surface for methane across a 600 ft by 600 ft square centered on CARB’s estimated plume location.",
           deadline: "Within 10 calendar days of the notice",
           section: "§ 95469(b)(2)(A)1.–2.",
           quote: "Within 10 calendar days of receiving a notification pursuant to section 95469(b)(1), the owner or operator shall perform surface emissions and component leak monitoring",
@@ -34,6 +35,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "survey-components",
+          brief: "Leak-check every gas-system component in that square.",
           duty: "In the same square, check every gas-system component (pipes, valves, fittings) for leaks, whatever its pressure.",
           deadline: "Within 10 calendar days of the notice",
           section: "§ 95469(b)(2)(A)3.",
@@ -42,6 +44,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "fix-surface",
+          brief: "Any reading over 500 ppmv: start corrective action in 5 days, re-test in 10 days and at one month.",
           duty: "If a surface reading is over the 500 ppmv limit (§ 95465(a)(1)), start corrective action within 5 days, re-test within 10 days, and re-test again one month after the first high reading.",
           deadline: "Start within 5 days; re-test within 10 days and at one month",
           section: "§ 95469(b)(2)(B), applying § 95469(a)(1)(B)",
@@ -50,6 +53,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "fix-components",
+          brief: "Any leaking component: tag, repair and re-test it in 10 days.",
           duty: "If a component is leaking, tag it, repair it, and re-test it to show it is below the leak standard.",
           deadline: "Repair and re-test within 10 calendar days",
           section: "§ 95469(b)(2)(C), applying § 95469(c)(1)–(2)",
@@ -58,6 +62,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "report-controlled",
+          brief: "Report results, locations and initial fixes to CARB, with CARB’s ID number.",
           duty: "Report to CARB: the notice date and CARB ID number, the monitoring results, where each problem was found, and the initial corrective action.",
           deadline: "Within 15 calendar days of the notice",
           section: "§ 95470(b)(7)(A)",
@@ -66,6 +71,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "report-repairs",
+          brief: "Report the repair and re-test results once a re-test shows a fix.",
           duty: "When a re-test first shows a problem fixed, report the repair date, re-test dates and re-test readings.",
           deadline: "Within 5 calendar days of that re-test",
           section: "§ 95470(b)(7)(B)",
@@ -80,6 +86,7 @@ window.LMB_CHECKLIST = {
       items: [
         {
           id: "survey-uncontrolled",
+          brief: "Survey the entire landfill surface for methane.",
           duty: "Test the entire landfill surface for methane.",
           deadline: "Within 30 calendar days of the notice",
           section: "§ 95469(b)(3)(A)",
@@ -88,6 +95,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "report-uncontrolled",
+          brief: "Report the survey and every high reading to CARB, with CARB’s ID number.",
           duty: "Report to CARB: the notice date and CARB ID number, the test date, the instrument used, and each high reading with its location.",
           deadline: "Within 35 calendar days of the notice",
           section: "§ 95470(b)(7)(C)",
@@ -102,7 +110,8 @@ window.LMB_CHECKLIST = {
       items: [
         {
           id: "submit-online",
-          duty: "Submit reports electronically through CARB's Landfill Methane Regulation reporting webpage.",
+          brief: "File reports through CARB’s online LMR reporting page.",
+          duty: "Submit reports electronically through CARB’s Landfill Methane Regulation reporting webpage.",
           deadline: null,
           section: "§ 95470(b)(9)",
           quote: "All reports, notifications, and requests to the Executive Officer shall be submitted electronically through the Landfill Methane Regulation reporting webpage",
@@ -110,6 +119,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "certify",
+          brief: "A responsible official certifies each report.",
           duty: "Have a responsible official certify each report as true, accurate and complete.",
           deadline: null,
           section: "§ 95470(b)(10)",
@@ -118,6 +128,7 @@ window.LMB_CHECKLIST = {
         },
         {
           id: "keep-records",
+          brief: "Keep records 5 years, in California; give them to CARB within 5 business days on request.",
           duty: "Keep electronic records of each exceedance and leak, its repair and re-tests, and the CARB ID number, for at least five years, stored in California.",
           deadline: "Keep 5 years; provide to CARB within 5 business days on request",
           section: "§ 95470(a)(1), (a)(1)(G), (a)(3)",
