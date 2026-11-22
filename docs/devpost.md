@@ -2,7 +2,9 @@
 
 **Project name:** Methane Docket
 
-**Tagline (under 200 characters):** Where California’s landfills leak methane, where on the site it keeps happening, and what the 2027 rule asks the operator once CARB sends a notice.
+**Tagline (under 200 characters):** Where California’s landfills release methane, where on the site it keeps happening, and what the 2027 rule asks the operator once CARB sends a notice.
+
+**Links:** https://elijah-gt.github.io/methane-docket/ and https://github.com/Elijah-GT/methane-docket
 
 ## Inspiration
 
